@@ -1,28 +1,44 @@
 "use client"
 
-import { useAuth } from "@/contexts/AuthContext"
-import { useBooking } from "@/contexts/BookingContext"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Calendar, Clock, MapPin, Users, Star, CreditCard, MessageSquare } from "lucide-react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { DashboardLayout } from "@/components/DashboardLayout"
+import { useAuth } from "@/contexts/AuthContext"
+import { bookingService } from "@/services/bookingService"
+import type { Booking } from "@/services/bookingService"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Loader2 } from "lucide-react"
 
 export default function BookingsPage() {
   const { user } = useAuth()
-  const { getUserBookings, venues, payments } = useBooking()
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    const fetchBookings = async () => {
+      const result = await bookingService.getUserBookings()
+      if (result.success) {
+        setBookings(result.bookings)
+      } else {
+        setError(result.error || "Failed to fetch bookings")
+      }
+      setLoading(false)
+    }
+
+    if (user) {
+      fetchBookings()
+    }
+  }, [user])
 
   if (!user) return null
 
-  const userBookings = getUserBookings(user.id)
-
-  const pendingBookings = userBookings.filter((b) => b.status === "pending")
-  const approvedBookings = userBookings.filter((b) => b.status === "approved")
-  const paidBookings = userBookings.filter((b) => b.status === "paid")
-  const completedBookings = userBookings.filter((b) => b.status === "completed")
-  const rejectedBookings = userBookings.filter((b) => b.status === "rejected")
+  const pendingBookings = bookings.filter((b) => b.status === "pending")
+  const approvedBookings = bookings.filter((b) => b.status === "approved")
+  const paidBookings = bookings.filter((b) => b.status === "paid")
+  const completedBookings = bookings.filter((b) => b.status === "completed")
+  const rejectedBookings = bookings.filter((b) => b.status === "rejected")
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -41,245 +57,192 @@ export default function BookingsPage() {
     }
   }
 
-  const getVenueName = (venueId: string) => {
-    const venue = venues.find((v) => v.id === venueId)
-    return venue?.name || "Unknown Venue"
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })
   }
 
-  const getPaymentForBooking = (bookingId: string) => {
-    return payments.find((p) => p.bookingId === bookingId)
+  const formatTime = (dateString: string) => {
+    return new Date(dateString).toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })
   }
 
-  const BookingCard = ({ booking }: { booking: any }) => {
-    const payment = getPaymentForBooking(booking.id)
-
+  const BookingCard = ({ booking }: { booking: Booking }) => {
     return (
-      <Card key={booking.id}>
+      <Card>
         <CardHeader>
           <div className="flex justify-between items-start">
             <div>
-              <CardTitle className="flex items-center gap-2">
-                {getVenueName(booking.venueId)}
-                <Badge className={getStatusColor(booking.status)}>{booking.status}</Badge>
-              </CardTitle>
-              <CardDescription className="flex items-center gap-1 mt-1">
-                <MapPin className="h-4 w-4" />
-                {venues.find((v) => v.id === booking.venueId)?.location}
-              </CardDescription>
+              <CardTitle>{booking.venue.name}</CardTitle>
+              <CardDescription>{booking.venue.location}</CardDescription>
             </div>
-            {booking.price && (
-              <Badge variant="outline" className="text-lg font-semibold">
-                ${booking.price}
-              </Badge>
-            )}
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(booking.status)}`}>
+              {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+            </span>
           </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                <span>{booking.date}</span>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium">Date</p>
+                <p className="text-sm text-gray-600">{formatDate(booking.booking_date)}</p>
               </div>
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                <span>
-                  {booking.startTime} - {booking.endTime}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                <span>{booking.guests} guests</span>
+              <div>
+                <p className="text-sm font-medium">Time</p>
+                <p className="text-sm text-gray-600">
+                  {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
+                </p>
               </div>
             </div>
 
-            <p className="text-sm text-gray-600">{booking.description}</p>
+            <div>
+              <p className="text-sm font-medium">Purpose</p>
+              <p className="text-sm text-gray-600">{booking.purpose}</p>
+            </div>
 
-            {booking.amenities.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {booking.amenities.map((amenity) => (
-                  <Badge key={amenity} variant="outline" className="text-xs">
-                    {amenity}
-                  </Badge>
+            {booking.event_details && (
+              <div>
+                <p className="text-sm font-medium">Event Details</p>
+                <p className="text-sm text-gray-600">{booking.event_details}</p>
+              </div>
+            )}
+
+            <div>
+              <p className="text-sm font-medium">Required Amenities</p>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {booking.required_amenities.map((amenity) => (
+                  <span
+                    key={amenity}
+                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+                  >
+                    {amenity.charAt(0).toUpperCase() + amenity.slice(1)}
+                  </span>
                 ))}
               </div>
-            )}
-
-            {booking.controlNumber && (
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <div className="flex items-center gap-2 text-sm">
-                  <CreditCard className="h-4 w-4" />
-                  <span className="font-medium">Control Number: {booking.controlNumber}</span>
-                </div>
-                {booking.paymentDeadline && (
-                  <p className="text-xs text-gray-600 mt-1">
-                    Payment deadline: {new Date(booking.paymentDeadline).toLocaleDateString()}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {booking.feedback && (
-              <div className="p-3 bg-green-50 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                  <span className="text-sm font-medium">Your Feedback</span>
-                  <Badge variant="outline">{booking.feedback.rating}/5</Badge>
-                </div>
-                <p className="text-sm text-gray-600">{booking.feedback.comment}</p>
-              </div>
-            )}
-
-            <div className="flex gap-2">
-              <Link href={`/dashboard/bookings/${booking.id}`}>
-                <Button variant="outline" size="sm">
-                  View Details
-                </Button>
-              </Link>
-
-              {booking.status === "approved" && payment && payment.status === "pending" && (
-                <Link href={`/dashboard/payment/${booking.id}`}>
-                  <Button size="sm">Make Payment</Button>
-                </Link>
-              )}
-
-              {booking.status === "paid" && !booking.feedback && (
-                <Link href={`/dashboard/feedback/${booking.id}`}>
-                  <Button variant="outline" size="sm">
-                    <MessageSquare className="h-4 w-4 mr-1" />
-                    Leave Feedback
-                  </Button>
-                </Link>
-              )}
             </div>
+
+            {booking.rejection_reason && (
+              <div>
+                <p className="text-sm font-medium text-red-600">Rejection Reason</p>
+                <p className="text-sm text-red-600">{booking.rejection_reason}</p>
+              </div>
+            )}
+
+            {booking.control_number && (
+              <div>
+                <p className="text-sm font-medium">Control Number</p>
+                <p className="text-sm text-gray-600">{booking.control_number}</p>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
     )
   }
 
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout>
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </DashboardLayout>
+    )
+  }
+
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">My Bookings</h1>
-            <p className="text-gray-600">Manage your venue booking requests</p>
-          </div>
+          <h1 className="text-2xl font-bold">My Bookings</h1>
           <Link href="/dashboard/book">
-            <Button>Book New Venue</Button>
+            <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+              Book a Venue
+            </button>
           </Link>
         </div>
 
-        <Tabs defaultValue="all" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="all">All ({userBookings.length})</TabsTrigger>
-            <TabsTrigger value="pending">Pending ({pendingBookings.length})</TabsTrigger>
-            <TabsTrigger value="approved">Approved ({approvedBookings.length})</TabsTrigger>
-            <TabsTrigger value="paid">Paid ({paidBookings.length})</TabsTrigger>
-            <TabsTrigger value="completed">Completed ({completedBookings.length})</TabsTrigger>
-            <TabsTrigger value="rejected">Rejected ({rejectedBookings.length})</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="all" className="space-y-4">
-            {userBookings.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <p className="text-gray-500 mb-4">No bookings found</p>
-                  <Link href="/dashboard/book">
-                    <Button>Make Your First Booking</Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {userBookings.map((booking) => (
-                  <BookingCard key={booking.id} booking={booking} />
-                ))}
+        {bookings.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-600">You haven't made any bookings yet.</p>
+            <Link href="/dashboard/book" className="text-blue-600 hover:underline mt-2 inline-block">
+              Book your first venue
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {pendingBookings.length > 0 && (
+              <div>
+                <h2 className="text-xl font-semibold mb-4">Pending Bookings</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {pendingBookings.map((booking) => (
+                    <BookingCard key={booking.id} booking={booking} />
+                  ))}
+                </div>
               </div>
             )}
-          </TabsContent>
 
-          <TabsContent value="pending" className="space-y-4">
-            {pendingBookings.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <p className="text-gray-500">No pending bookings</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {pendingBookings.map((booking) => (
-                  <BookingCard key={booking.id} booking={booking} />
-                ))}
+            {approvedBookings.length > 0 && (
+              <div>
+                <h2 className="text-xl font-semibold mb-4">Approved Bookings</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {approvedBookings.map((booking) => (
+                    <BookingCard key={booking.id} booking={booking} />
+                  ))}
+                </div>
               </div>
             )}
-          </TabsContent>
 
-          <TabsContent value="approved" className="space-y-4">
-            {approvedBookings.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <p className="text-gray-500">No approved bookings</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {approvedBookings.map((booking) => (
-                  <BookingCard key={booking.id} booking={booking} />
-                ))}
+            {paidBookings.length > 0 && (
+              <div>
+                <h2 className="text-xl font-semibold mb-4">Paid Bookings</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {paidBookings.map((booking) => (
+                    <BookingCard key={booking.id} booking={booking} />
+                  ))}
+                </div>
               </div>
             )}
-          </TabsContent>
 
-          <TabsContent value="paid" className="space-y-4">
-            {paidBookings.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <p className="text-gray-500">No paid bookings</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {paidBookings.map((booking) => (
-                  <BookingCard key={booking.id} booking={booking} />
-                ))}
+            {completedBookings.length > 0 && (
+              <div>
+                <h2 className="text-xl font-semibold mb-4">Completed Bookings</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {completedBookings.map((booking) => (
+                    <BookingCard key={booking.id} booking={booking} />
+                  ))}
+                </div>
               </div>
             )}
-          </TabsContent>
 
-          <TabsContent value="completed" className="space-y-4">
-            {completedBookings.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <p className="text-gray-500">No completed bookings</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {completedBookings.map((booking) => (
-                  <BookingCard key={booking.id} booking={booking} />
-                ))}
+            {rejectedBookings.length > 0 && (
+              <div>
+                <h2 className="text-xl font-semibold mb-4">Rejected Bookings</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {rejectedBookings.map((booking) => (
+                    <BookingCard key={booking.id} booking={booking} />
+                  ))}
+                </div>
               </div>
             )}
-          </TabsContent>
-
-          <TabsContent value="rejected" className="space-y-4">
-            {rejectedBookings.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <p className="text-gray-500">No rejected bookings</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {rejectedBookings.map((booking) => (
-                  <BookingCard key={booking.id} booking={booking} />
-                ))}
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   )
