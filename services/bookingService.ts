@@ -106,6 +106,23 @@ interface BookingsResponse {
   data: Booking[]
 }
 
+interface UserStats {
+  total_bookings: number
+  pending_bookings: number
+  approved_bookings: number
+  rejected_bookings: number
+  completed_bookings: number
+}
+
+interface UserStatsResponse {
+  success: boolean
+  message: string
+  data: {
+    stats: UserStats
+    recent_bookings: Booking[]
+  }
+}
+
 export const bookingService = {
   async searchVenues(params: SearchVenueParams): Promise<{ success: boolean; venues?: Venue[]; error?: string }> {
     try {
@@ -202,6 +219,34 @@ export const bookingService = {
     } catch (error) {
       console.error("Error fetching bookings:", error)
       return { success: false, error: "Failed to fetch bookings" }
+    }
+  },
+
+  async getUserStats() {
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        return { success: false, error: "Not authenticated" }
+      }
+
+      const response = await fetch(`${API_URL}/user/stats`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        return { success: false, error: data.message || "Failed to fetch user stats" }
+      }
+
+      return { success: true, stats: data.data.stats, recentBookings: data.data.recent_bookings }
+    } catch (error) {
+      console.error("Error fetching user stats:", error)
+      return { success: false, error: "Failed to fetch user stats" }
     }
   },
 } 
