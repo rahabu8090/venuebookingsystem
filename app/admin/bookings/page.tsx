@@ -322,10 +322,10 @@ export default function AdminBookingsPage() {
                       onApprove={handleApprove}
                       onReject={handleReject}
                     />
-                  ))}
+                ))}
               </div>
-            </TabsContent>
-          ))}
+          </TabsContent>
+              ))}
         </Tabs>
       </div>
     </AdminLayout>
