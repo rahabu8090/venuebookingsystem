@@ -2,22 +2,25 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 export function middleware(request: NextRequest) {
-  const token = request.cookies.get("token")?.value
+  // Get the pathname of the request
+  const { pathname } = request.nextUrl
 
-  // Check if the request is for a dashboard route
-  if (request.nextUrl.pathname.startsWith("/dashboard")) {
-    // If no token is present, redirect to login
-    if (!token) {
-      const loginUrl = new URL("/auth/login", request.url)
-      loginUrl.searchParams.set("from", request.nextUrl.pathname)
-      return NextResponse.redirect(loginUrl)
-    }
+  // Check if the path is for admin routes
+  if (pathname.startsWith("/admin")) {
+    // In a real application, you would verify the user's role from a JWT token or session
+    // For this demo, we'll allow access and let the client-side handle the redirect
+    return NextResponse.next()
+  }
+
+  // Check if the path is for dashboard routes
+  if (pathname.startsWith("/dashboard")) {
+    // In a real application, you would verify authentication here
+    return NextResponse.next()
   }
 
   return NextResponse.next()
 }
 
-// Configure which routes to run middleware on
 export const config = {
-  matcher: ["/dashboard/:path*"],
+  matcher: ["/admin/:path*", "/dashboard/:path*"],
 }

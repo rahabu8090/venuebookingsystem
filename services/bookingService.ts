@@ -1,6 +1,5 @@
 import type { Venue } from "@/contexts/BookingContext"
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL
+import { API_URL } from "@/lib/constants"
 
 export interface SearchVenueParams {
   booking_date: string
@@ -65,39 +64,45 @@ export interface BookingResponse {
   }
 }
 
+export interface User {
+  id: string
+  full_name: string
+  email: string
+  image_path: string | null
+  role: string
+  phone_number: string
+  registration_number: string
+  address: string
+  profile_picture: string | null
+  is_active: boolean
+  email_verified_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Booking {
   id: string
-  user_id: string
-  venue_id: string
+  user: {
+    id: string
+    full_name: string
+    email: string
+    phone_number: string
+    registration_number: string
+    role: string
+  }
+  venue: {
+    id: string
+    name: string
+    location: string
+  }
   booking_date: string
   start_time: string
   end_time: string
   required_capacity: number
-  required_amenities: string[]
-  status: string
-  control_number: string | null
-  rejection_reason: string | null
   purpose: string
-  event_details: string | null
-  created_at: string
-  updated_at: string
-  venue: {
-    id: string
-    name: string
-    description: string
-    capacity: number
-    cost_amount: string
-    location: string
-    image_path: string
-    is_active: boolean
-    availability_schedule: Array<{
-      date: string
-      time_slots: string[]
-    }>
-    amenities: string[]
-    created_at: string
-    updated_at: string
-  }
+  event_details?: string
+  status: "pending" | "approved" | "paid" | "completed" | "rejected"
+  price?: number
 }
 
 interface BookingsResponse {
@@ -121,6 +126,12 @@ interface UserStatsResponse {
     stats: UserStats
     recent_bookings: Booking[]
   }
+}
+
+export interface AdminBookingsResponse {
+  success: boolean
+  message: string
+  data: Booking[]
 }
 
 export const bookingService = {
@@ -247,6 +258,79 @@ export const bookingService = {
     } catch (error) {
       console.error("Error fetching user stats:", error)
       return { success: false, error: "Failed to fetch user stats" }
+    }
+  },
+
+  async getAdminBookings(): Promise<AdminBookingsResponse> {
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        throw new Error("Not authenticated")
+      }
+
+      const response = await fetch(`${API_URL}/admin/bookings`, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch bookings")
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error("Error fetching admin bookings:", error)
+      throw error
+    }
+  },
+
+  async updateBookingStatus(
+    bookingId: string,
+    status: Booking["status"],
+    controlNumber?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        throw new Error("No authentication token found")
+      }
+
+      let endpoint = `${API_URL}/admin/bookings/${bookingId}`
+      let method = "PUT"
+      let body = { status }
+
+      // Use the approve endpoint for approved status
+      if (status === "approved") {
+        endpoint = `${API_URL}/admin/bookings/${bookingId}/approve`
+        method = "POST"
+        body = { control_number: controlNumber }
+      }
+
+      const response = await fetch(endpoint, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to update booking status")
+      }
+
+      return { success: true }
+    } catch (error) {
+      console.error("Error updating booking status:", error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to update booking status",
+      }
     }
   },
 } 

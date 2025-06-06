@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
 import { bookingService } from "@/services/bookingService"
 import type { Booking } from "@/services/bookingService"
@@ -12,6 +13,7 @@ import { Loader2, Calendar, Clock, Users, Star, Building2, BookOpen } from "luci
 
 export default function DashboardPage() {
   const { user } = useAuth()
+  const router = useRouter()
   const [stats, setStats] = useState({
     total_bookings: 0,
     pending_bookings: 0,
@@ -24,6 +26,11 @@ export default function DashboardPage() {
   const [error, setError] = useState("")
 
   useEffect(() => {
+    if (user?.role === "admin") {
+      router.push("/admin")
+      return
+    }
+
     const fetchStats = async () => {
       const result = await bookingService.getUserStats()
       if (result.success) {
@@ -38,7 +45,7 @@ export default function DashboardPage() {
     if (user) {
       fetchStats()
     }
-  }, [user])
+  }, [user, router])
 
   if (!user) return null
 
