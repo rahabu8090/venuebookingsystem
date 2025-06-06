@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, memo } from "react"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
-import { useBooking } from "@/contexts/BookingContext"
+import { bookingService, type Booking } from "@/services/bookingService"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -17,252 +18,274 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Calendar, Clock, MapPin, Users, Check, X } from "lucide-react"
+import { Calendar, Clock, MapPin, Users, Check, X, User, Phone, Mail } from "lucide-react"
 import { AdminLayout } from "@/components/AdminLayout"
 import { useToast } from "@/hooks/use-toast"
-import { mockAuthService } from "@/services/mockAuthService"
+import { format } from "date-fns"
 
-export default function AdminBookingsPage() {
-  const { user } = useAuth()
-  const { bookings, venues, updateBookingStatus, refreshData } = useBooking()
-  const { toast } = useToast()
-  const [selectedBooking, setSelectedBooking] = useState(null)
-  const [price, setPrice] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [users, setUsers] = useState([])
+interface BookingCardProps {
+  booking: Booking
+  controlNumber: string
+  isLoading: boolean
+  onControlNumberChange: (value: string) => void
+  onApprove: (booking: Booking) => void
+  onReject: (booking: Booking) => void
+}
 
-  // Load users data
-  useState(() => {
-    mockAuthService.getAllUsers().then(setUsers)
-  })
-
-  if (!user || user.role !== "admin") {
-    return null
-  }
-
-  const pendingBookings = bookings.filter((b) => b.status === "pending")
-  const approvedBookings = bookings.filter((b) => b.status === "approved")
-  const paidBookings = bookings.filter((b) => b.status === "paid")
-  const completedBookings = bookings.filter((b) => b.status === "completed")
-  const rejectedBookings = bookings.filter((b) => b.status === "rejected")
-
-  const getStatusColor = (status: string) => {
+const BookingCard = memo(({ 
+  booking, 
+  controlNumber, 
+  isLoading, 
+  onControlNumberChange, 
+  onApprove, 
+  onReject 
+}: BookingCardProps) => {
+  const getStatusColor = (status: Booking["status"]) => {
     switch (status) {
       case "pending":
         return "bg-yellow-100 text-yellow-800"
       case "approved":
         return "bg-blue-100 text-blue-800"
-      case "rejected":
-        return "bg-red-100 text-red-800"
       case "paid":
         return "bg-green-100 text-green-800"
       case "completed":
-        return "bg-purple-100 text-purple-800"
+        return "bg-gray-100 text-gray-800"
+      case "rejected":
+        return "bg-red-100 text-red-800"
       default:
         return "bg-gray-100 text-gray-800"
     }
   }
 
-  const getVenueName = (venueId: string) => {
-    const venue = venues.find((v) => v.id === venueId)
-    return venue?.name || "Unknown Venue"
+  const formatDate = (date: string) => {
+    return format(new Date(date), "MMMM d, yyyy")
   }
 
-  const getUserName = (userId: string) => {
-    const userData = users.find((u) => u.id === userId)
-    return userData?.name || "Unknown User"
+  const formatTime = (time: string) => {
+    return format(new Date(time), "h:mm a")
   }
 
-  const getUserRole = (userId: string) => {
-    const userData = users.find((u) => u.id === userId)
-    return userData?.role || "unknown"
-  }
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex justify-between items-start">
+          <div>
+            <CardTitle>{booking.venue.name}</CardTitle>
+            <CardDescription>{booking.venue.location}</CardDescription>
+          </div>
+          <Badge className={getStatusColor(booking.status)}>
+            {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-gray-500" />
+              <span className="text-sm">{formatDate(booking.booking_date)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-gray-500" />
+              <span className="text-sm">
+                {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-gray-500" />
+              <span className="text-sm">Required Capacity: {booking.required_capacity}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-gray-500" />
+              <span className="text-sm">{booking.venue.location}</span>
+            </div>
+          </div>
 
-  const handleApprove = async (booking: any) => {
-    if (!price || Number.parseFloat(price) <= 0) {
+          <div className="border-t pt-4">
+            <h4 className="font-medium mb-2">Booking Details</h4>
+            <p className="text-sm text-gray-600 mb-2">
+              <span className="font-medium">Purpose:</span> {booking.purpose}
+            </p>
+            {booking.event_details && (
+              <p className="text-sm text-gray-600">
+                <span className="font-medium">Event Details:</span> {booking.event_details}
+              </p>
+            )}
+          </div>
+
+          <div className="border-t pt-4">
+            <h4 className="font-medium mb-2">User Information</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-gray-500" />
+                <span className="text-sm">{booking.user.full_name}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-gray-500" />
+                <span className="text-sm">{booking.user.email}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Phone className="h-4 w-4 text-gray-500" />
+                <span className="text-sm">{booking.user.phone_number}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-gray-500" />
+                <span className="text-sm">{booking.user.registration_number}</span>
+              </div>
+            </div>
+          </div>
+
+          {booking.status === "pending" && (
+            <div className="border-t pt-4">
+              <div className="flex items-end gap-4">
+                <div className="flex-1">
+                  <Label htmlFor={`control-number-${booking.id}`}>Control Number</Label>
+                  <Input
+                    id={`control-number-${booking.id}`}
+                    value={controlNumber}
+                    onChange={(e) => onControlNumberChange(e.target.value)}
+                    placeholder="Enter control number (e.g., CN-12345678)"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => onReject(booking)}>
+                    Reject
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    onClick={() => onApprove(booking)}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? "Approving..." : "Approve"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+})
+
+BookingCard.displayName = "BookingCard"
+
+export default function AdminBookingsPage() {
+  const { user } = useAuth()
+  const router = useRouter()
+  const { toast } = useToast()
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [controlNumbers, setControlNumbers] = useState<Record<string, string>>({})
+  const [loadingBookings, setLoadingBookings] = useState<Record<string, boolean>>({})
+
+  useEffect(() => {
+    if (!user || user.role !== "admin") {
+      router.push("/dashboard")
+    } else {
+      fetchBookings()
+    }
+  }, [user, router])
+
+  const fetchBookings = async () => {
+    try {
+      const response = await bookingService.getAdminBookings()
+      if (response.success) {
+        setBookings(response.data)
+      }
+    } catch (error) {
+      console.error("Error fetching bookings:", error)
       toast({
-        title: "Invalid Price",
-        description: "Please enter a valid price",
+        title: "Error",
+        description: "Failed to fetch bookings",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const pendingBookings = bookings.filter((booking) => booking.status === "pending")
+  const approvedBookings = bookings.filter((booking) => booking.status === "approved")
+  const paidBookings = bookings.filter((booking) => booking.status === "paid")
+  const completedBookings = bookings.filter((booking) => booking.status === "completed")
+  const rejectedBookings = bookings.filter((booking) => booking.status === "rejected")
+
+  const handleApprove = async (booking: Booking) => {
+    const controlNumber = controlNumbers[booking.id]
+    if (!controlNumber) {
+      toast({
+        title: "Error",
+        description: "Please enter a control number",
         variant: "destructive",
       })
       return
     }
 
-    setLoading(true)
+    setLoadingBookings(prev => ({ ...prev, [booking.id]: true }))
     try {
-      const result = await updateBookingStatus(booking.id, "approved", Number.parseFloat(price))
+      const result = await bookingService.updateBookingStatus(booking.id, "approved", controlNumber)
       if (result.success) {
         toast({
-          title: "Booking Approved",
-          description: "Booking has been approved and payment details sent to user",
+          title: "Success",
+          description: "Booking approved successfully",
         })
-        setSelectedBooking(null)
-        setPrice("")
-        await refreshData()
+        setControlNumbers(prev => {
+          const newState = { ...prev }
+          delete newState[booking.id]
+          return newState
+        })
+        await fetchBookings()
       } else {
         toast({
-          title: "Approval Failed",
+          title: "Error",
           description: result.error || "Failed to approve booking",
           variant: "destructive",
         })
       }
     } catch (error) {
       toast({
-        title: "Approval Failed",
-        description: "An error occurred while approving the booking",
+        title: "Error",
+        description: "Failed to approve booking",
         variant: "destructive",
       })
+    } finally {
+      setLoadingBookings(prev => ({ ...prev, [booking.id]: false }))
     }
-    setLoading(false)
   }
 
-  const handleReject = async (booking: any) => {
-    setLoading(true)
+  const handleReject = async (booking: Booking) => {
+    setLoadingBookings(prev => ({ ...prev, [booking.id]: true }))
     try {
-      const result = await updateBookingStatus(booking.id, "rejected")
+      const result = await bookingService.updateBookingStatus(booking.id, "rejected")
       if (result.success) {
         toast({
-          title: "Booking Rejected",
-          description: "Booking has been rejected",
+          title: "Success",
+          description: "Booking rejected successfully",
         })
-        setSelectedBooking(null)
-        await refreshData()
+        await fetchBookings()
       } else {
         toast({
-          title: "Rejection Failed",
+          title: "Error",
           description: result.error || "Failed to reject booking",
           variant: "destructive",
         })
       }
     } catch (error) {
       toast({
-        title: "Rejection Failed",
-        description: "An error occurred while rejecting the booking",
+        title: "Error",
+        description: "Failed to reject booking",
         variant: "destructive",
       })
+    } finally {
+      setLoadingBookings(prev => ({ ...prev, [booking.id]: false }))
     }
-    setLoading(false)
   }
 
-  const BookingCard = ({ booking }: { booking: any }) => (
-    <Card key={booking.id}>
-      <CardHeader>
-        <div className="flex justify-between items-start">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              {getVenueName(booking.venueId)}
-              <Badge className={getStatusColor(booking.status)}>{booking.status}</Badge>
-            </CardTitle>
-            <CardDescription className="flex items-center gap-1 mt-1">
-              <MapPin className="h-4 w-4" />
-              {venues.find((v) => v.id === booking.venueId)?.location}
-            </CardDescription>
-          </div>
-          {booking.price && (
-            <Badge variant="outline" className="text-lg font-semibold">
-              ${booking.price}
-            </Badge>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              <span>{booking.date}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              <span>
-                {booking.startTime} - {booking.endTime}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              <span>{booking.guests} guests</span>
-            </div>
-            <div>
-              <span className="font-medium">User:</span> {getUserName(booking.userId)} ({getUserRole(booking.userId)})
-            </div>
-          </div>
-
-          <p className="text-sm text-gray-600">{booking.description}</p>
-
-          {booking.amenities.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {booking.amenities.map((amenity) => (
-                <Badge key={amenity} variant="outline" className="text-xs">
-                  {amenity}
-                </Badge>
-              ))}
-            </div>
-          )}
-
-          {booking.controlNumber && (
-            <div className="p-3 bg-blue-50 rounded-lg">
-              <div className="flex items-center gap-2 text-sm">
-                <span className="font-medium">Control Number: {booking.controlNumber}</span>
-              </div>
-              {booking.paymentDeadline && (
-                <p className="text-xs text-gray-600 mt-1">
-                  Payment deadline: {new Date(booking.paymentDeadline).toLocaleDateString()}
-                </p>
-              )}
-            </div>
-          )}
-
-          <div className="flex gap-2">
-            {booking.status === "pending" && (
-              <>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button size="sm" onClick={() => setSelectedBooking(booking)}>
-                      <Check className="h-4 w-4 mr-1" />
-                      Approve
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Approve Booking</DialogTitle>
-                      <DialogDescription>Set the price for this booking and approve the request</DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="price">Price ($)</Label>
-                        <Input
-                          id="price"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={price}
-                          onChange={(e) => setPrice(e.target.value)}
-                          placeholder="Enter booking price"
-                        />
-                      </div>
-                      <div className="flex gap-2">
-                        <Button onClick={() => handleApprove(booking)} disabled={loading}>
-                          {loading ? "Approving..." : "Approve Booking"}
-                        </Button>
-                        <Button variant="outline" onClick={() => setSelectedBooking(null)}>
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-
-                <Button variant="destructive" size="sm" onClick={() => handleReject(booking)} disabled={loading}>
-                  <X className="h-4 w-4 mr-1" />
-                  Reject
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
+  if (!user || user.role !== "admin") {
+    return null
+  }
 
   return (
     <AdminLayout>
@@ -279,96 +302,30 @@ export default function AdminBookingsPage() {
             <TabsTrigger value="paid">Paid ({paidBookings.length})</TabsTrigger>
             <TabsTrigger value="completed">Completed ({completedBookings.length})</TabsTrigger>
             <TabsTrigger value="rejected">Rejected ({rejectedBookings.length})</TabsTrigger>
-            <TabsTrigger value="all">All ({bookings.length})</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="pending" className="space-y-4">
-            {pendingBookings.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <p className="text-gray-500">No pending bookings</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {pendingBookings.map((booking) => (
-                  <BookingCard key={booking.id} booking={booking} />
-                ))}
+          {["pending", "approved", "paid", "completed", "rejected"].map((status) => (
+            <TabsContent key={status} value={status}>
+              <div className="grid grid-cols-1 gap-6">
+                {bookings
+                  .filter((booking) => booking.status === status)
+                  .map((booking) => (
+                    <BookingCard
+                      key={booking.id}
+                      booking={booking}
+                      controlNumber={controlNumbers[booking.id] || ""}
+                      isLoading={loadingBookings[booking.id] || false}
+                      onControlNumberChange={(value) => setControlNumbers(prev => ({
+                        ...prev,
+                        [booking.id]: value
+                      }))}
+                      onApprove={handleApprove}
+                      onReject={handleReject}
+                    />
+                  ))}
               </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="approved" className="space-y-4">
-            {approvedBookings.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <p className="text-gray-500">No approved bookings</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {approvedBookings.map((booking) => (
-                  <BookingCard key={booking.id} booking={booking} />
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="paid" className="space-y-4">
-            {paidBookings.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <p className="text-gray-500">No paid bookings</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {paidBookings.map((booking) => (
-                  <BookingCard key={booking.id} booking={booking} />
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="completed" className="space-y-4">
-            {completedBookings.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <p className="text-gray-500">No completed bookings</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {completedBookings.map((booking) => (
-                  <BookingCard key={booking.id} booking={booking} />
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="rejected" className="space-y-4">
-            {rejectedBookings.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <p className="text-gray-500">No rejected bookings</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {rejectedBookings.map((booking) => (
-                  <BookingCard key={booking.id} booking={booking} />
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="all" className="space-y-4">
-            <div className="space-y-4">
-              {bookings.map((booking) => (
-                <BookingCard key={booking.id} booking={booking} />
-              ))}
-            </div>
-          </TabsContent>
+            </TabsContent>
+          ))}
         </Tabs>
       </div>
     </AdminLayout>
