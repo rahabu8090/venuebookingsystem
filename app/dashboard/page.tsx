@@ -1,20 +1,46 @@
 "use client"
 
-import { useAuth } from "@/contexts/AuthContext"
-import { useBooking } from "@/contexts/BookingContext"
-import { Button } from "@/components/ui/button"
-import { Calendar, Clock, Users, Star, Building2, BookOpen } from "lucide-react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useAuth } from "@/contexts/AuthContext"
+import { bookingService } from "@/services/bookingService"
+import type { Booking } from "@/services/bookingService"
 import { DashboardLayout } from "@/components/DashboardLayout"
+import { Button } from "@/components/ui/button"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Loader2, Calendar, Clock, Users, Star, Building2, BookOpen } from "lucide-react"
 
 export default function DashboardPage() {
   const { user } = useAuth()
-  const { getUserBookings, venues } = useBooking()
+  const [stats, setStats] = useState({
+    total_bookings: 0,
+    pending_bookings: 0,
+    approved_bookings: 0,
+    rejected_bookings: 0,
+    completed_bookings: 0,
+  })
+  const [recentBookings, setRecentBookings] = useState<Booking[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      const result = await bookingService.getUserStats()
+      if (result.success) {
+        setStats(result.stats)
+        setRecentBookings(result.recentBookings)
+      } else {
+        setError(result.error || "Failed to fetch user stats")
+      }
+      setLoading(false)
+    }
+
+    if (user) {
+      fetchStats()
+    }
+  }, [user])
 
   if (!user) return null
-
-  const userBookings = getUserBookings(user.id)
-  const recentBookings = userBookings.slice(0, 3)
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -33,9 +59,39 @@ export default function DashboardPage() {
     }
   }
 
-  const getVenueName = (venueId: string) => {
-    const venue = venues.find((v) => v.id === venueId)
-    return venue?.name || "Unknown Venue"
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })
+  }
+
+  const formatTime = (dateString: string) => {
+    return new Date(dateString).toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout>
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </DashboardLayout>
+    )
   }
 
   return (
@@ -64,7 +120,7 @@ export default function DashboardPage() {
               <h3 className="text-sm font-medium text-gray-600">Total Bookings</h3>
               <Calendar className="h-5 w-5 text-university-blue" />
             </div>
-            <div className="text-3xl font-bold text-blue-700">{userBookings.length}</div>
+            <div className="text-3xl font-bold text-blue-700">{stats.total_bookings}</div>
             <p className="text-sm text-gray-500">All time bookings</p>
           </div>
 
@@ -73,9 +129,7 @@ export default function DashboardPage() {
               <h3 className="text-sm font-medium text-gray-600">Pending Approval</h3>
               <Clock className="h-5 w-5 text-yellow-500" />
             </div>
-            <div className="text-3xl font-bold text-yellow-500">
-              {userBookings.filter((b) => b.status === "pending").length}
-            </div>
+            <div className="text-3xl font-bold text-yellow-500">{stats.pending_bookings}</div>
             <p className="text-sm text-gray-500">Awaiting confirmation</p>
           </div>
 
@@ -84,9 +138,7 @@ export default function DashboardPage() {
               <h3 className="text-sm font-medium text-gray-600">Completed</h3>
               <Star className="h-5 w-5 text-university-green" />
             </div>
-            <div className="text-3xl font-bold text-university-green">
-              {userBookings.filter((b) => b.status === "completed").length}
-            </div>
+            <div className="text-3xl font-bold text-university-green">{stats.completed_bookings}</div>
             <p className="text-sm text-gray-500">Successfully completed</p>
           </div>
         </div>
@@ -138,7 +190,7 @@ export default function DashboardPage() {
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <h3 className="font-semibold text-blue-700 text-lg">{getVenueName(booking.venueId)}</h3>
+                      <h3 className="font-semibold text-blue-700 text-lg">{booking.venue.name}</h3>
                       <span className={getStatusColor(booking.status)}>{booking.status}</span>
                     </div>
                     <Link href={`/dashboard/bookings/${booking.id}`}>
@@ -151,23 +203,23 @@ export default function DashboardPage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 mb-3">
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4" />
-                      {booking.date}
+                      {formatDate(booking.booking_date)}
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4" />
-                      {booking.startTime} - {booking.endTime}
+                      {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
                     </div>
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4" />
-                      {booking.guests} guests
+                      {booking.required_capacity} guests
                     </div>
                   </div>
 
-                  <p className="text-gray-600 text-sm">{booking.description}</p>
+                  <p className="text-gray-600 text-sm">{booking.purpose}</p>
                 </div>
               ))}
 
-              {userBookings.length > 3 && (
+              {recentBookings.length > 3 && (
                 <div className="text-center pt-4">
                   <Link href="/dashboard/bookings">
                     <Button className="btn-outline">View All Bookings</Button>
@@ -176,36 +228,6 @@ export default function DashboardPage() {
               )}
             </div>
           )}
-        </div>
-
-        {/* Featured Venues */}
-        <div className="university-card p-6">
-          <h2 className="text-xl font-semibold text-blue-700 mb-4">Featured Venues</h2>
-          <p className="text-gray-600 mb-6">Explore some of our popular venues for your next booking</p>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {venues.slice(0, 3).map((venue) => (
-              <div key={venue.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
-                <img
-                  src={venue.images[0] || "/placeholder.svg?height=120&width=200"}
-                  alt={venue.name}
-                  className="w-full h-24 object-cover rounded-lg mb-3"
-                />
-                <h3 className="font-semibold text-blue-700 mb-1">{venue.name}</h3>
-                <p className="text-sm text-gray-600 mb-2">{venue.location}</p>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Up to {venue.capacity} guests</span>
-                  <span className="font-semibold text-blue-700">${venue.hourlyRate}/hr</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="text-center mt-6">
-            <Link href="/dashboard/book">
-              <Button className="btn-outline">View All Venues</Button>
-            </Link>
-          </div>
         </div>
       </div>
     </DashboardLayout>
