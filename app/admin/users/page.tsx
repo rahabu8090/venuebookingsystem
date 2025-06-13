@@ -1,56 +1,84 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
+import { userService, type User } from "@/services/userService"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { User, Mail, Phone, Building, GraduationCap, Search } from "lucide-react"
+import { User as UserIcon, Mail, Phone, Building, GraduationCap, Search } from "lucide-react"
 import { AdminLayout } from "@/components/AdminLayout"
-import { mockAuthService } from "@/services/mockAuthService"
 
 export default function AdminUsersPage() {
   const { user } = useAuth()
-  const [users, setUsers] = useState([])
-  const [filteredUsers, setFilteredUsers] = useState([])
+  const router = useRouter()
+  const [users, setUsers] = useState<User[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [roleFilter, setRoleFilter] = useState("all")
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [pagination, setPagination] = useState({
+    total: 0,
+    per_page: 15,
+    current_page: 1,
+    last_page: 1,
+    from: 0,
+    to: 0
+  })
 
   useEffect(() => {
+    if (!user || user.role !== "admin") {
+      router.push("/dashboard")
+      return
+    }
+
     loadUsers()
-  }, [])
+  }, [user, router])
 
-  useEffect(() => {
-    filterUsers()
-  }, [users, searchTerm, roleFilter])
-
-  const loadUsers = async () => {
+  const loadUsers = async (page = 1) => {
     try {
-      const userData = await mockAuthService.getAllUsers()
-      setUsers(userData)
+      setLoading(true)
+      const params: any = {
+        page,
+        per_page: pagination.per_page
+      }
+
+      if (searchTerm) {
+        params.search = searchTerm
+      }
+
+      if (roleFilter !== "all") {
+        params.role = roleFilter
+      }
+
+      const response = await userService.getUsers(params)
+      if (response.success) {
+        setUsers(response.data.users)
+        setPagination(response.data.pagination)
+      }
     } catch (error) {
       console.error("Failed to load users:", error)
+      setError("Failed to load users")
+    } finally {
+      setLoading(false)
     }
   }
 
-  const filterUsers = () => {
-    let filtered = users
+  const handleSearch = (value: string) => {
+    setSearchTerm(value)
+    loadUsers(1)
+  }
 
-    if (roleFilter !== "all") {
-      filtered = filtered.filter((u) => u.role === roleFilter)
-    }
+  const handleRoleFilter = (value: string) => {
+    setRoleFilter(value)
+    loadUsers(1)
+  }
 
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (u) =>
-          u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          u.email.toLowerCase().includes(searchTerm.toLowerCase()),
-      )
-    }
-
-    setFilteredUsers(filtered)
+  const handlePageChange = (page: number) => {
+    loadUsers(page)
   }
 
   if (!user || user.role !== "admin") {
@@ -83,11 +111,11 @@ export default function AdminUsersPage() {
       case "external":
         return Building
       default:
-        return User
+        return UserIcon
     }
   }
 
-  const UserCard = ({ userData }: { userData: any }) => {
+  const UserCard = ({ userData }: { userData: User }) => {
     const RoleIcon = getRoleIcon(userData.role)
 
     return (
@@ -96,10 +124,10 @@ export default function AdminUsersPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-                <User className="w-6 h-6 text-gray-600" />
+                <UserIcon className="w-6 h-6 text-gray-600" />
               </div>
               <div>
-                <CardTitle className="text-lg">{userData.name}</CardTitle>
+                <CardTitle className="text-lg">{userData.full_name}</CardTitle>
                 <CardDescription className="flex items-center gap-1">
                   <Mail className="h-4 w-4" />
                   {userData.email}
@@ -114,31 +142,24 @@ export default function AdminUsersPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-2 text-sm">
-            {userData.phone && (
+            {userData.phone_number && (
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4 text-gray-500" />
-                <span>{userData.phone}</span>
+                <span>{userData.phone_number}</span>
               </div>
             )}
 
-            {userData.studentId && (
+            {userData.registration_number && (
               <div className="flex items-center gap-2">
                 <GraduationCap className="h-4 w-4 text-gray-500" />
-                <span>Student ID: {userData.studentId}</span>
+                <span>Student ID: {userData.registration_number}</span>
               </div>
             )}
 
-            {userData.department && (
+            {userData.address && (
               <div className="flex items-center gap-2">
                 <Building className="h-4 w-4 text-gray-500" />
-                <span>Department: {userData.department}</span>
-              </div>
-            )}
-
-            {userData.organization && (
-              <div className="flex items-center gap-2">
-                <Building className="h-4 w-4 text-gray-500" />
-                <span>Organization: {userData.organization}</span>
+                <span>Address: {userData.address}</span>
               </div>
             )}
           </div>
@@ -168,12 +189,12 @@ export default function AdminUsersPage() {
                   <Input
                     placeholder="Search users by name or email..."
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => handleSearch(e.target.value)}
                     className="pl-10"
                   />
                 </div>
               </div>
-              <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <Select value={roleFilter} onValueChange={handleRoleFilter}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="Filter by role" />
                 </SelectTrigger>
@@ -188,46 +209,77 @@ export default function AdminUsersPage() {
           </CardContent>
         </Card>
 
-        <Tabs defaultValue="all" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="all">All Users ({users.length})</TabsTrigger>
-            <TabsTrigger value="student">Students ({studentUsers.length})</TabsTrigger>
-            <TabsTrigger value="staff">Staff ({staffUsers.length})</TabsTrigger>
-            <TabsTrigger value="external">External ({externalUsers.length})</TabsTrigger>
-          </TabsList>
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+          </div>
+        ) : error ? (
+          <div className="text-center py-8 text-red-500">{error}</div>
+        ) : (
+          <Tabs defaultValue="all" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="all">All Users ({users.length})</TabsTrigger>
+              <TabsTrigger value="student">Students ({studentUsers.length})</TabsTrigger>
+              <TabsTrigger value="staff">Staff ({staffUsers.length})</TabsTrigger>
+              <TabsTrigger value="external">External ({externalUsers.length})</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="all" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredUsers.map((userData) => (
-                <UserCard key={userData.id} userData={userData} />
-              ))}
-            </div>
-          </TabsContent>
+            <TabsContent value="all" className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {users.map((userData) => (
+                  <UserCard key={userData.id} userData={userData} />
+                ))}
+              </div>
+            </TabsContent>
 
-          <TabsContent value="student" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {studentUsers.map((userData) => (
-                <UserCard key={userData.id} userData={userData} />
-              ))}
-            </div>
-          </TabsContent>
+            <TabsContent value="student" className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {studentUsers.map((userData) => (
+                  <UserCard key={userData.id} userData={userData} />
+                ))}
+              </div>
+            </TabsContent>
 
-          <TabsContent value="staff" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {staffUsers.map((userData) => (
-                <UserCard key={userData.id} userData={userData} />
-              ))}
-            </div>
-          </TabsContent>
+            <TabsContent value="staff" className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {staffUsers.map((userData) => (
+                  <UserCard key={userData.id} userData={userData} />
+                ))}
+              </div>
+            </TabsContent>
 
-          <TabsContent value="external" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {externalUsers.map((userData) => (
-                <UserCard key={userData.id} userData={userData} />
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
+            <TabsContent value="external" className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {externalUsers.map((userData) => (
+                  <UserCard key={userData.id} userData={userData} />
+                ))}
+              </div>
+            </TabsContent>
+
+            {/* Pagination */}
+            {pagination.last_page > 1 && (
+              <div className="flex justify-center gap-2 mt-6">
+                <button
+                  onClick={() => handlePageChange(pagination.current_page - 1)}
+                  disabled={pagination.current_page === 1}
+                  className="px-3 py-1 rounded border disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <span className="px-3 py-1">
+                  Page {pagination.current_page} of {pagination.last_page}
+                </span>
+                <button
+                  onClick={() => handlePageChange(pagination.current_page + 1)}
+                  disabled={pagination.current_page === pagination.last_page}
+                  className="px-3 py-1 rounded border disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </Tabs>
+        )}
       </div>
     </AdminLayout>
   )
