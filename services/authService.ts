@@ -43,27 +43,35 @@ export const authService = {
 
   async register(userData: any): Promise<{ success: boolean; user?: User; error?: string }> {
     try {
+      const payload: any = {
+        full_name: userData.name,
+        email: userData.email,
+        password: userData.password,
+        password_confirmation: userData.passwordConfirmation,
+        role: userData.role === "external" ? "external user" : userData.role,
+        phone_number: userData.phone,
+        address: userData.address,
+      }
+      // Only send registration_number if role is student
+      if (payload.role === "student") {
+        payload.registration_number = userData.studentId
+      } else {
+        payload.registration_number = null
+      }
+
       const response = await fetch(`${API_URL}/auth/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
         },
-        body: JSON.stringify({
-          full_name: userData.name,
-          email: userData.email,
-          password: userData.password,
-          password_confirmation: userData.passwordConfirmation,
-          role: userData.role,
-          phone_number: userData.phone,
-          registration_number: userData.studentId,
-          address: userData.address,
-        }),
+        body: JSON.stringify(payload),
       })
 
       const data = await response.json()
 
       if (!response.ok) {
+        console.error("Registration error details:", data)
         return { success: false, error: data.message || "Registration failed" }
       }
 
