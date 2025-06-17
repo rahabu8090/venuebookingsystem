@@ -1,4 +1,5 @@
 import { API_URL } from "@/lib/constants"
+import type { User } from "@/contexts/AuthContext"
 
 interface UserStats {
   total: number
@@ -97,6 +98,36 @@ interface AdminStatsResponse {
   data: AdminStats
 }
 
+export interface AdminReport {
+  overview: {
+    total_revenue: string
+    total_users: number
+    average_booking_value: string
+  }
+  bookings_by_role: {
+    student: number
+    staff?: number
+    "external user"?: number
+  }
+  venue_utilization: Array<{
+    venue_id: string
+    venue_name: string
+    total_bookings: number
+    total_revenue: string
+    utilization_rate: number
+  }>
+  booking_status_distribution: {
+    approved: number
+    pending?: number
+    rejected?: number
+  }
+  monthly_trends: Array<{
+    month: string
+    total_bookings: number
+    total_revenue: string
+  }>
+}
+
 export const adminService = {
   async getStats(): Promise<AdminStatsResponse> {
     try {
@@ -124,5 +155,32 @@ export const adminService = {
       console.error("Error fetching admin statistics:", error)
       throw error
     }
-  }
+  },
+
+  async getReports(): Promise<{ success: boolean; data?: AdminReport; error?: string }> {
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        return { success: false, error: "Not authenticated" }
+      }
+
+      const response = await fetch(`${API_URL}/admin/reports`, {
+        method: "GET",
+        headers: {
+          "Accept": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        return { success: false, error: data.message || "Failed to fetch reports" }
+      }
+
+      return { success: true, data: data.data }
+    } catch (error) {
+      return { success: false, error: "Failed to fetch reports" }
+    }
+  },
 } 
