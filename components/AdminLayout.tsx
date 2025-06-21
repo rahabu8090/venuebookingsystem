@@ -22,7 +22,6 @@ import {
   Settings,
   LogOut,
   Shield,
-  Bell,
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
@@ -99,10 +98,6 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   )
                 })}
               </nav>
-
-              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
-                <Bell className="h-5 w-5" />
-              </Button>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
