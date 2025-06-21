@@ -1,18 +1,68 @@
 "use client"
 
 import { useAuth } from "@/contexts/AuthContext"
-import { useBooking } from "@/contexts/BookingContext"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, Users, Building2, CreditCard, TrendingUp, Clock, AlertTriangle } from "lucide-react"
+import { Calendar, Users, Building2, CreditCard, TrendingUp, Clock, AlertTriangle, Loader2 } from "lucide-react"
 import { AdminLayout } from "@/components/AdminLayout"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
+import { useToast } from "@/hooks/use-toast"
+
+interface AdminStats {
+  users: {
+    total: number
+    active: number
+    by_role: {
+      admin: number
+      staff: number
+      student: number
+      "external user": number
+    }
+  }
+  venues: {
+    total: number
+    active: number
+    total_capacity: number
+    average_capacity: number
+  }
+  bookings: {
+    total: number
+    pending: number
+    approved: number
+    rejected: number
+    today: number
+    this_week: number
+    this_month: number
+  }
+  revenue: {
+    total: number
+    today: number
+    this_week: number
+    this_month: number
+  }
+  recent_bookings: Array<{
+    id: string
+    venue: {
+      name: string
+    }
+    user: {
+      name: string
+    }
+    status: string
+    start_time: string
+    end_time: string
+    created_at: string
+    description?: string
+  }>
+}
 
 export default function AdminDashboard() {
   const { user } = useAuth()
-  const { bookings, venues, payments } = useBooking()
   const router = useRouter()
+  const { toast } = useToast()
+  const [stats, setStats] = useState<AdminStats | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (user && user.role !== "admin") {
@@ -20,26 +70,73 @@ export default function AdminDashboard() {
     }
   }, [user, router])
 
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (!user || user.role !== "admin") return
+
+      try {
+        setLoading(true)
+        const response = await fetch('http://127.0.0.1:8000/api/admin/stats', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+        })
+
+        const result = await response.json()
+
+        if (result.success) {
+          setStats(result.data)
+        } else {
+          toast({
+            title: "Error",
+            description: result.message || "Failed to fetch admin statistics",
+            variant: "destructive",
+          })
+        }
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to fetch admin statistics",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchStats()
+  }, [user, toast])
+
   if (!user || user.role !== "admin") {
     return null
   }
 
-  // Calculate statistics
-  const totalBookings = bookings.length
-  const pendingBookings = bookings.filter((b) => b.status === "pending").length
-  const approvedBookings = bookings.filter((b) => b.status === "approved").length
-  const paidBookings = bookings.filter((b) => b.status === "paid").length
-  const completedBookings = bookings.filter((b) => b.status === "completed").length
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="flex items-center space-x-2">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span>Loading admin statistics...</span>
+          </div>
+        </div>
+      </AdminLayout>
+    )
+  }
 
-  const totalRevenue = payments.filter((p) => p.status === "confirmed").reduce((sum, p) => sum + p.amount, 0)
-
-  const pendingPayments = payments.filter((p) => p.status === "pending").length
-  const overduePayments = payments.filter((p) => p.status === "pending" && new Date() > new Date(p.deadline)).length
-
-  // Recent activity
-  const recentBookings = bookings
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 5)
+  if (!stats) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Failed to Load Statistics</h2>
+            <p className="text-gray-600">Unable to fetch admin dashboard data</p>
+          </div>
+        </div>
+      </AdminLayout>
+    )
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -58,9 +155,23 @@ export default function AdminDashboard() {
     }
   }
 
-  const getVenueName = (venueId: string) => {
-    const venue = venues.find((v) => v.id === venueId)
-    return venue?.name || "Unknown Venue"
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'TZS',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount)
+  }
+
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
   }
 
   return (
@@ -96,8 +207,8 @@ export default function AdminDashboard() {
               <Calendar className="h-5 w-5 university-text-navy" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold university-text-navy">{totalBookings}</div>
-              <p className="text-xs text-gray-600 mt-1">{pendingBookings} pending approval</p>
+              <div className="text-3xl font-bold university-text-navy">{stats.bookings.total}</div>
+              <p className="text-xs text-gray-600 mt-1">{stats.bookings.pending} pending approval</p>
             </CardContent>
           </Card>
 
@@ -107,8 +218,8 @@ export default function AdminDashboard() {
               <Building2 className="h-5 w-5 university-text-navy" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold university-text-navy">{venues.length}</div>
-              <p className="text-xs text-gray-600 mt-1">Available for booking</p>
+              <div className="text-3xl font-bold university-text-navy">{stats.venues.active}</div>
+              <p className="text-xs text-gray-600 mt-1">of {stats.venues.total} total venues</p>
             </CardContent>
           </Card>
 
@@ -118,26 +229,19 @@ export default function AdminDashboard() {
               <TrendingUp className="h-5 w-5 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-green-600">${totalRevenue}</div>
-              <p className="text-xs text-gray-600 mt-1">From confirmed payments</p>
+              <div className="text-3xl font-bold text-green-600">{formatCurrency(stats.revenue.total)}</div>
+              <p className="text-xs text-gray-600 mt-1">From approved bookings</p>
             </CardContent>
           </Card>
 
           <Card className="university-stats-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Pending Payments</CardTitle>
-              <CreditCard className="h-5 w-5 text-yellow-600" />
+              <CardTitle className="text-sm font-medium text-gray-600">Active Users</CardTitle>
+              <Users className="h-5 w-5 text-blue-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-yellow-600">{pendingPayments}</div>
-              <p className="text-xs text-gray-600 mt-1">
-                {overduePayments > 0 && (
-                  <span className="text-red-600 flex items-center">
-                    <AlertTriangle className="w-3 h-3 mr-1" />
-                    {overduePayments} overdue
-                  </span>
-                )}
-              </p>
+              <div className="text-3xl font-bold text-blue-600">{stats.users.active}</div>
+              <p className="text-xs text-gray-600 mt-1">of {stats.users.total} total users</p>
             </CardContent>
           </Card>
         </div>
@@ -149,7 +253,7 @@ export default function AdminDashboard() {
               <CardTitle className="text-sm university-text-navy">Pending Review</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">{pendingBookings}</div>
+              <div className="text-2xl font-bold text-yellow-600">{stats.bookings.pending}</div>
             </CardContent>
           </Card>
 
@@ -158,25 +262,25 @@ export default function AdminDashboard() {
               <CardTitle className="text-sm university-text-navy">Approved</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{approvedBookings}</div>
+              <div className="text-2xl font-bold text-blue-600">{stats.bookings.approved}</div>
             </CardContent>
           </Card>
 
           <Card className="university-card">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm university-text-navy">Payment Received</CardTitle>
+              <CardTitle className="text-sm university-text-navy">Today's Bookings</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{paidBookings}</div>
+              <div className="text-2xl font-bold text-green-600">{stats.bookings.today}</div>
             </CardContent>
           </Card>
 
           <Card className="university-card">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm university-text-navy">Completed</CardTitle>
+              <CardTitle className="text-sm university-text-navy">This Week</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-purple-600">{completedBookings}</div>
+              <div className="text-2xl font-bold text-purple-600">{stats.bookings.this_week}</div>
             </CardContent>
           </Card>
 
@@ -185,9 +289,37 @@ export default function AdminDashboard() {
               <CardTitle className="text-sm university-text-navy">Rejected</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-600">
-                {bookings.filter((b) => b.status === "rejected").length}
-              </div>
+              <div className="text-2xl font-bold text-red-600">{stats.bookings.rejected}</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Revenue Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="university-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm university-text-navy">Today's Revenue</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{formatCurrency(stats.revenue.today)}</div>
+            </CardContent>
+          </Card>
+
+          <Card className="university-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm university-text-navy">This Week's Revenue</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">{formatCurrency(stats.revenue.this_week)}</div>
+            </CardContent>
+          </Card>
+
+          <Card className="university-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm university-text-navy">This Month's Revenue</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-600">{formatCurrency(stats.revenue.this_month)}</div>
             </CardContent>
           </Card>
         </div>
@@ -199,18 +331,18 @@ export default function AdminDashboard() {
             <CardDescription>Latest booking requests requiring administrative attention</CardDescription>
           </CardHeader>
           <CardContent>
-            {recentBookings.length === 0 ? (
+            {stats.recent_bookings.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-gray-500">No recent booking activity</p>
               </div>
             ) : (
               <div className="space-y-4">
-                {recentBookings.map((booking) => (
+                {stats.recent_bookings.map((booking) => (
                   <div key={booking.id} className="university-card p-4 hover:shadow-md transition-all">
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-semibold university-text-navy">{getVenueName(booking.venueId)}</h3>
+                          <h3 className="font-semibold university-text-navy">{booking.venue.name}</h3>
                           <Badge className={getStatusColor(booking.status)}>
                             {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                           </Badge>
@@ -218,21 +350,23 @@ export default function AdminDashboard() {
                         <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
                           <div className="flex items-center gap-1">
                             <Calendar className="h-4 w-4" />
-                            {booking.date}
+                            {new Date(booking.start_time).toLocaleDateString()}
                           </div>
                           <div className="flex items-center gap-1">
                             <Clock className="h-4 w-4" />
-                            {booking.startTime} - {booking.endTime}
+                            {new Date(booking.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(booking.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </div>
                           <div className="flex items-center gap-1">
                             <Users className="h-4 w-4" />
-                            {booking.guests} attendees
+                            {booking.user.name}
                           </div>
                         </div>
-                        <p className="text-sm text-gray-600">{booking.description}</p>
+                        {booking.description && (
+                          <p className="text-sm text-gray-600">{booking.description}</p>
+                        )}
                       </div>
                       <div className="text-right text-xs text-gray-500">
-                        {new Date(booking.createdAt).toLocaleDateString()}
+                        {formatDateTime(booking.created_at)}
                       </div>
                     </div>
                   </div>
