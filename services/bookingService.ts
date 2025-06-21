@@ -101,11 +101,13 @@ export interface Booking {
   required_capacity: number
   purpose: string
   event_details?: string
-  status: "pending" | "approved" | "paid" | "completed" | "rejected"
+  status: "pending" | "approved" | "paid" | "completed" | "rejected" | "cancelled"
   price?: number
   approved_cost?: number
   control_number?: string
   rejection_reason?: string
+  cancellation_reason?: string
+  required_amenities?: string[]
 }
 
 interface BookingsResponse {
@@ -347,6 +349,38 @@ export const bookingService = {
       return {
         success: false,
         error: error instanceof Error ? error.message : "Failed to update booking status",
+      }
+    }
+  },
+
+  async cancelBooking(bookingId: string, cancellationReason: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        throw new Error("No authentication token found")
+      }
+
+      const response = await fetch(`${API_URL}/bookings/${bookingId}/cancel`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ cancellation_reason: cancellationReason }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to cancel booking")
+      }
+
+      return { success: true }
+    } catch (error) {
+      console.error("Error cancelling booking:", error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to cancel booking",
       }
     }
   },
