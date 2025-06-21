@@ -109,8 +109,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold mb-2">
-                Welcome back, {user.name.split(" ")[0]}{" "}
-                {user.role === "student" ? "Student" : user.role === "staff" ? "Staff" : ""}!
+                Welcome back, {user.name ? user.name.split(" ")[0] : "User"}{" "}
               </h1>
               <p className="text-blue-100 text-lg">Manage your venue bookings and explore available spaces</p>
             </div>
