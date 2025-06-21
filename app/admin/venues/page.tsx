@@ -146,6 +146,12 @@ export default function AdminVenuesPage() {
     }).format(numAmount)
   }
 
+  const getImageUrl = (imagePath: string | null) => {
+    if (!imagePath) return null
+    const baseUrl = process.env.NEXT_PUBLIC_IMAGE_URL || 'http://127.0.0.1:8000'
+    return `${baseUrl}${imagePath}`
+  }
+
   useEffect(() => {
     if (!user || user.role !== "admin") {
       router.push("/dashboard")
@@ -461,18 +467,19 @@ export default function AdminVenuesPage() {
 
   return (
     <AdminLayout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Venue Management</h1>
-            <p className="text-gray-600">Manage venues and their details</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Venue Management</h1>
+            <p className="text-sm sm:text-base text-gray-600">Manage venues and their details</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <Dialog open={isTimetableDialogOpen} onOpenChange={setIsTimetableDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline">
+                <Button variant="outline" className="w-full sm:w-auto">
                   <Calendar className="h-4 w-4 mr-2" />
-                  Import Timetable
+                  <span className="hidden sm:inline">Import Timetable</span>
+                  <span className="sm:hidden">Timetable</span>
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
@@ -483,7 +490,7 @@ export default function AdminVenuesPage() {
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleTimetableSubmit}>
-                  <div className="grid gap-6 py-4">
+                  <div className="grid gap-4 sm:gap-6 py-4">
                     <div className="grid gap-2">
                       <Label htmlFor="timetable-file">Timetable File</Label>
                       <Input
@@ -497,7 +504,7 @@ export default function AdminVenuesPage() {
                         Supported formats: Excel (.xlsx, .xls) or CSV (.csv). Max size: 10MB
                       </p>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="grid gap-2">
                         <Label htmlFor="start-date">Start Date</Label>
                         <Input
@@ -534,7 +541,7 @@ export default function AdminVenuesPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <Button
                         type="button"
                         variant="outline"
@@ -542,7 +549,8 @@ export default function AdminVenuesPage() {
                         className="w-full"
                       >
                         <Download className="h-4 w-4 mr-2" />
-                        Download Excel Template
+                        <span className="hidden sm:inline">Download Excel Template</span>
+                        <span className="sm:hidden">Excel Template</span>
                       </Button>
                       <Button
                         type="button"
@@ -551,7 +559,8 @@ export default function AdminVenuesPage() {
                         className="w-full"
                       >
                         <Download className="h-4 w-4 mr-2" />
-                        Download CSV Template
+                        <span className="hidden sm:inline">Download CSV Template</span>
+                        <span className="sm:hidden">CSV Template</span>
                       </Button>
                     </div>
                   </div>
@@ -561,7 +570,7 @@ export default function AdminVenuesPage() {
                     </Alert>
                   )}
                   <DialogFooter>
-                    <Button type="submit" disabled={timetableLoading}>
+                    <Button type="submit" disabled={timetableLoading} className="w-full sm:w-auto">
                       {timetableLoading ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -580,12 +589,12 @@ export default function AdminVenuesPage() {
             </Dialog>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={resetForm}>
+              <Button onClick={resetForm} className="w-full sm:w-auto">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Venue
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add New Venue</DialogTitle>
                 <DialogDescription>Enter the details of the new venue.</DialogDescription>
@@ -612,8 +621,10 @@ export default function AdminVenuesPage() {
                       onChange={handleInputChange}
                       placeholder="Enter venue description"
                       required
+                      className="min-h-[80px]"
                     />
                   </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="grid gap-2">
                     <Label htmlFor="capacity">Capacity</Label>
                     <Input
@@ -625,6 +636,20 @@ export default function AdminVenuesPage() {
                       placeholder="Enter venue capacity"
                       required
                     />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="cost_amount">Cost Amount</Label>
+                      <Input
+                        id="cost_amount"
+                        name="cost_amount"
+                        type="number"
+                        step="0.01"
+                        value={formData.cost_amount}
+                        onChange={handleInputChange}
+                        placeholder="Enter venue cost"
+                        required
+                      />
+                    </div>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="location">Location</Label>
@@ -638,19 +663,6 @@ export default function AdminVenuesPage() {
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="cost_amount">Cost Amount</Label>
-                    <Input
-                      id="cost_amount"
-                      name="cost_amount"
-                      type="number"
-                      step="0.01"
-                      value={formData.cost_amount}
-                      onChange={handleInputChange}
-                      placeholder="Enter venue cost"
-                      required
-                    />
-                  </div>
-                  <div className="grid gap-2">
                     <Label htmlFor="image">Venue Image</Label>
                     <Input
                       id="image"
@@ -660,10 +672,13 @@ export default function AdminVenuesPage() {
                       onChange={handleImageChange}
                       required
                     />
+                    <p className="text-xs text-gray-500">
+                      Supported formats: JPG, PNG, GIF. Max size: 5MB
+                    </p>
                   </div>
                   <div className="grid gap-2">
                     <Label>Amenities</Label>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[200px] overflow-y-auto p-2 border rounded-md">
                       {availableAmenities.map((amenity) => (
                         <div key={amenity} className="flex items-center space-x-2">
                           <Checkbox
@@ -695,8 +710,8 @@ export default function AdminVenuesPage() {
                     <AlertDescription>{error}</AlertDescription>
                   </Alert>
                 )}
-                <DialogFooter>
-                  <Button type="submit" disabled={loading}>
+                <DialogFooter className="sticky bottom-0 bg-background pt-4 border-t">
+                  <Button type="submit" disabled={loading} className="w-full sm:w-auto">
                     {loading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -711,7 +726,7 @@ export default function AdminVenuesPage() {
             </DialogContent>
           </Dialog>
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-              <DialogContent className="sm:max-w-[425px]">
+              <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Edit Venue</DialogTitle>
                   <DialogDescription>Update the venue details.</DialogDescription>
@@ -738,19 +753,35 @@ export default function AdminVenuesPage() {
                         onChange={handleEditInputChange}
                         placeholder="Enter venue description"
                         required
+                        className="min-h-[80px]"
                       />
                     </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="edit-capacity">Capacity</Label>
-                      <Input
-                        id="edit-capacity"
-                        name="capacity"
-                        type="number"
-                        value={editFormData.capacity}
-                        onChange={handleEditInputChange}
-                        placeholder="Enter venue capacity"
-                        required
-                      />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="edit-capacity">Capacity</Label>
+                        <Input
+                          id="edit-capacity"
+                          name="capacity"
+                          type="number"
+                          value={editFormData.capacity}
+                          onChange={handleEditInputChange}
+                          placeholder="Enter venue capacity"
+                          required
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="edit-cost_amount">Cost Amount</Label>
+                        <Input
+                          id="edit-cost_amount"
+                          name="cost_amount"
+                          type="number"
+                          step="0.01"
+                          value={editFormData.cost_amount}
+                          onChange={handleEditInputChange}
+                          placeholder="Enter venue cost"
+                          required
+                        />
+                      </div>
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="edit-location">Location</Label>
@@ -764,19 +795,6 @@ export default function AdminVenuesPage() {
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="edit-cost_amount">Cost Amount</Label>
-                      <Input
-                        id="edit-cost_amount"
-                        name="cost_amount"
-                        type="number"
-                        step="0.01"
-                        value={editFormData.cost_amount}
-                        onChange={handleEditInputChange}
-                        placeholder="Enter venue cost"
-                        required
-                      />
-                    </div>
-                    <div className="grid gap-2">
                       <Label htmlFor="edit-image">Venue Image (Optional)</Label>
                       <Input
                         id="edit-image"
@@ -786,12 +804,12 @@ export default function AdminVenuesPage() {
                         onChange={handleEditImageChange}
                       />
                       <p className="text-xs text-gray-500">
-                        Leave empty to keep the current image
+                        Leave empty to keep the current image. Supported formats: JPG, PNG, GIF. Max size: 5MB
                       </p>
                     </div>
                     <div className="grid gap-2">
                       <Label>Amenities</Label>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[200px] overflow-y-auto p-2 border rounded-md">
                         {availableAmenities.map((amenity) => (
                           <div key={amenity} className="flex items-center space-x-2">
                             <Checkbox
@@ -823,8 +841,8 @@ export default function AdminVenuesPage() {
                       <AlertDescription>{error}</AlertDescription>
                     </Alert>
                   )}
-                  <DialogFooter>
-                    <Button type="submit" disabled={editLoading}>
+                  <DialogFooter className="sticky bottom-0 bg-background pt-4 border-t">
+                    <Button type="submit" disabled={editLoading} className="w-full sm:w-auto">
                       {editLoading ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -880,6 +898,7 @@ export default function AdminVenuesPage() {
                       setDeletingVenue(null)
                     }}
                     disabled={deleteLoading}
+                    className="w-full sm:w-auto"
                   >
                     Cancel
                   </Button>
@@ -887,6 +906,7 @@ export default function AdminVenuesPage() {
                     variant="destructive"
                     onClick={confirmDelete}
                     disabled={deleteLoading}
+                    className="w-full sm:w-auto"
                   >
                     {deleteLoading ? (
                       <>
@@ -918,13 +938,13 @@ export default function AdminVenuesPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="p-6 border rounded-lg bg-gradient-to-br from-blue-50 to-blue-100">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+              <div className="p-4 sm:p-6 border rounded-lg bg-gradient-to-br from-blue-50 to-blue-100">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="p-2 bg-blue-600 rounded-lg">
                     <Upload className="h-5 w-5 text-white" />
                   </div>
-                  <h3 className="font-semibold text-lg">Import Timetable</h3>
+                  <h3 className="font-semibold text-base sm:text-lg">Import Timetable</h3>
                 </div>
                 <p className="text-sm text-gray-700 mb-4">
                   Upload timetable files to automatically schedule venue availability based on course schedules
@@ -938,12 +958,12 @@ export default function AdminVenuesPage() {
                   Import Now
                 </Button>
               </div>
-              <div className="p-6 border rounded-lg bg-gradient-to-br from-green-50 to-green-100">
+              <div className="p-4 sm:p-6 border rounded-lg bg-gradient-to-br from-green-50 to-green-100">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="p-2 bg-green-600 rounded-lg">
                     <Download className="h-5 w-5 text-white" />
                   </div>
-                  <h3 className="font-semibold text-lg">Download Templates</h3>
+                  <h3 className="font-semibold text-base sm:text-lg">Download Templates</h3>
                 </div>
                 <p className="text-sm text-gray-700 mb-4">
                   Get the correct format for your timetable files with our pre-configured templates
@@ -967,12 +987,12 @@ export default function AdminVenuesPage() {
                   </Button>
                 </div>
               </div>
-              <div className="p-6 border rounded-lg bg-gradient-to-br from-purple-50 to-purple-100">
+              <div className="p-4 sm:p-6 border rounded-lg bg-gradient-to-br from-purple-50 to-purple-100">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="p-2 bg-purple-600 rounded-lg">
                     <Calendar className="h-5 w-5 text-white" />
                   </div>
-                  <h3 className="font-semibold text-lg">File Format</h3>
+                  <h3 className="font-semibold text-base sm:text-lg">File Format</h3>
                 </div>
                 <p className="text-sm text-gray-700 mb-4">
                   Required columns: Day, Time Slot, Venue Name, Course/Subject
@@ -1002,34 +1022,44 @@ export default function AdminVenuesPage() {
 
         <Separator />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {venues.map((venue) => (
             <Card key={venue.id} className="overflow-hidden">
               <div className="aspect-video relative">
                 {venue.image_path ? (
                   <img
-                    src={venue.image_path}
+                    src={getImageUrl(venue.image_path) || ''}
                     alt={venue.name}
                     className="object-cover w-full h-full"
+                    onError={(e) => {
+                      // Fallback to placeholder if image fails to load
+                      const target = e.target as HTMLImageElement
+                      target.style.display = 'none'
+                      target.nextElementSibling?.classList.remove('hidden')
+                    }}
                   />
-                ) : (
+                ) : null}
+                {!venue.image_path && (
                   <div className="w-full h-full bg-gray-200 flex items-center justify-center">
                     <span className="text-gray-400">No image</span>
                   </div>
                 )}
+                <div className="w-full h-full bg-gray-200 flex items-center justify-center hidden">
+                  <span className="text-gray-400">Image not available</span>
+                </div>
                 <div className="absolute top-2 right-2">
                   <Badge variant={venue.is_active ? "default" : "secondary"}>
                     {venue.is_active ? "Active" : "Inactive"}
                   </Badge>
                 </div>
               </div>
-              <CardHeader>
-                <CardTitle>{venue.name}</CardTitle>
-                <CardDescription>{venue.location}</CardDescription>
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-base sm:text-lg">{venue.name}</CardTitle>
+                <CardDescription className="text-sm">{venue.location}</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 sm:p-6 pt-0">
                 <div className="space-y-4">
-                  <p className="text-sm text-gray-600">{venue.description}</p>
+                  <p className="text-sm text-gray-600 line-clamp-2">{venue.description}</p>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4 text-gray-500" />
@@ -1045,33 +1075,48 @@ export default function AdminVenuesPage() {
                       {venue.amenities.map((amenity) => {
                         const Icon = amenityIcons[amenity] || MapPin
                         return (
-                          <Badge key={amenity} variant="outline" className="flex items-center gap-1">
+                          <Badge key={amenity} variant="outline" className="flex items-center gap-1 text-xs">
                             <Icon className="h-3 w-3" />
+                            <span className="hidden sm:inline">
                             {amenity.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                            </span>
+                            <span className="sm:hidden">
+                              {amenity.split('_').map(word => word.charAt(0).toUpperCase()).join('')}
+                            </span>
                           </Badge>
                         )
                       })}
                     </div>
                   )}
-                  <div className="flex justify-end gap-2">
-                    <Button variant="outline" size="sm" onClick={() => {
-                      setIsEditDialogOpen(true)
-                      setEditingVenue(venue)
-                      setEditFormData({
-                        name: venue.name,
-                        description: venue.description,
-                        capacity: venue.capacity.toString(),
-                        location: venue.location,
-                        cost_amount: venue.cost_amount.toString(),
-                        image: null,
-                        is_active: venue.is_active,
-                        amenities: venue.amenities || [],
-                      })
-                    }}>
+                  <div className="flex flex-col sm:flex-row justify-end gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => {
+                        setIsEditDialogOpen(true)
+                        setEditingVenue(venue)
+                        setEditFormData({
+                          name: venue.name,
+                          description: venue.description,
+                          capacity: venue.capacity.toString(),
+                          location: venue.location,
+                          cost_amount: venue.cost_amount.toString(),
+                          image: null,
+                          is_active: venue.is_active,
+                          amenities: venue.amenities || [],
+                        })
+                      }}
+                      className="w-full sm:w-auto"
+                    >
                       <Edit className="h-4 w-4 mr-2" />
                       Edit
                     </Button>
-                    <Button variant="destructive" size="sm" onClick={() => handleDelete(venue)}>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      onClick={() => handleDelete(venue)}
+                      className="w-full sm:w-auto"
+                    >
                       <Trash2 className="h-4 w-4 mr-2" />
                       Delete
                     </Button>
@@ -1114,7 +1159,7 @@ export default function AdminVenuesPage() {
             )}
           </div>
           <DialogFooter>
-            <Button onClick={() => setIsSuccessDialogOpen(false)} className="w-full">
+            <Button onClick={() => setIsSuccessDialogOpen(false)} className="w-full sm:w-auto">
               Close
             </Button>
           </DialogFooter>
