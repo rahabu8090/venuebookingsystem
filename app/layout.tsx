@@ -5,6 +5,7 @@ import "./globals.css"
 import { AuthProvider } from "@/contexts/AuthContext"
 import { BookingProvider } from "@/contexts/BookingContext"
 import { Toaster } from "@/components/ui/toaster"
+import AuthGuard from "@/components/AuthGuard"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -24,7 +25,9 @@ export default function RootLayout({
       <body className={inter.className}>
         <AuthProvider>
           <BookingProvider>
-            {children}
+            <AuthGuard>
+              {children}
+            </AuthGuard>
             <Toaster />
           </BookingProvider>
         </AuthProvider>
