@@ -22,7 +22,7 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
-  const { user, logout } = useAuth()
+  const { user, logout, loading } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -38,6 +38,17 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     { name: "My Bookings", href: "/dashboard/bookings", icon: Calendar },
     { name: "Profile", href: "/dashboard/profile", icon: User },
   ]
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-university-blue mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   if (!user) return null
 
@@ -83,9 +94,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src="/placeholder-user.jpg" alt={user.name} />
+                  <AvatarImage src="/placeholder-user.jpg" alt={user.name || "User"} />
                   <AvatarFallback className="bg-university-blue text-white text-sm">
-                    {user.name.charAt(0)}
+                    {user.name ? user.name.charAt(0) : "U"}
                   </AvatarFallback>
                 </Avatar>
               </Button>
@@ -93,8 +104,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <DropdownMenuContent className="w-56" align="end" forceMount>
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{user.name}</p>
-                  <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                  <p className="text-sm font-medium leading-none">{user.name || "User"}</p>
+                  <p className="text-xs leading-none text-muted-foreground">{user.email || ""}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
@@ -147,12 +158,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               </div>
               <div className="space-y-2 text-sm">
                 <div>
-                  <span className="font-medium">Name:</span> {user.name}
+                  <span className="font-medium">Name:</span> {user.name || "Not set"}
                 </div>
                 <div>
                   <span className="font-medium">Role:</span>{" "}
                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                    {user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : "Unknown"}
                   </span>
                 </div>
                 {user.studentId && (
