@@ -5,14 +5,17 @@ import { createContext, useContext, useState, useEffect } from "react"
 import { authService } from "@/services/authService"
 
 export interface User {
-  id: string
+  id: number
+  full_name: string
   email: string
-  name: string
-  role: "student" | "staff" | "external" | "admin"
-  phone?: string
+  role: "student" | "staff" | "external user" | "admin"
+  phone_number: string
+  registration_number?: string
+  address?: string
   organization?: string
-  studentId?: string
   department?: string
+  created_at: string
+  updated_at: string
 }
 
 interface AuthContextType {
