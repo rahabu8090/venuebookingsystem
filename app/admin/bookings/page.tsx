@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Dialog,
@@ -26,20 +27,29 @@ import { format } from "date-fns"
 interface BookingCardProps {
   booking: Booking
   controlNumber: string
+  approvedCost: string
   isLoading: boolean
   onControlNumberChange: (value: string) => void
+  onApprovedCostChange: (value: string) => void
   onApprove: (booking: Booking) => void
-  onReject: (booking: Booking) => void
+  onReject: (booking: Booking, rejectionReason: string) => void
+  formatCurrency: (amount: number) => string
 }
 
 const BookingCard = memo(({ 
   booking, 
   controlNumber, 
+  approvedCost,
   isLoading, 
   onControlNumberChange, 
+  onApprovedCostChange,
   onApprove, 
-  onReject 
+  onReject,
+  formatCurrency
 }: BookingCardProps) => {
+  const [rejectionReason, setRejectionReason] = useState("")
+  const [showRejectDialog, setShowRejectDialog] = useState(false)
+
   const getStatusColor = (status: Booking["status"]) => {
     switch (status) {
       case "pending":
@@ -65,6 +75,19 @@ const BookingCard = memo(({
     return format(new Date(time), "h:mm a")
   }
 
+  const handleRejectClick = () => {
+    setShowRejectDialog(true)
+  }
+
+  const handleRejectConfirm = () => {
+    if (!rejectionReason.trim()) {
+      return
+    }
+    onReject(booking, rejectionReason)
+    setRejectionReason("")
+    setShowRejectDialog(false)
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -72,10 +95,33 @@ const BookingCard = memo(({
           <div>
             <CardTitle>{booking.venue.name}</CardTitle>
             <CardDescription>{booking.venue.location}</CardDescription>
+            {booking.approved_cost !== undefined && booking.status === "approved" && (
+              <div className="mt-2">
+                <Badge variant="outline" className="text-green-600 border-green-600">
+                  Approved Cost: {formatCurrency(booking.approved_cost)}
+                </Badge>
+              </div>
+            )}
+            {booking.rejection_reason && booking.status === "rejected" && (
+              <div className="mt-2">
+                <Badge variant="outline" className="text-red-600 border-red-600">
+                  Rejection Reason: {booking.rejection_reason}
+                </Badge>
+              </div>
+            )}
           </div>
-          <Badge className={getStatusColor(booking.status)}>
-            {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-          </Badge>
+          <div className="text-right">
+            <Badge className={getStatusColor(booking.status)}>
+              {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+            </Badge>
+            {booking.control_number && (
+              <div className="mt-2">
+                <Badge variant="secondary" className="text-xs">
+                  CN: {booking.control_number}
+                </Badge>
+              </div>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -111,6 +157,21 @@ const BookingCard = memo(({
                 <span className="font-medium">Event Details:</span> {booking.event_details}
               </p>
             )}
+            {booking.approved_cost !== undefined && (
+              <p className="text-sm text-gray-600">
+                <span className="font-medium">Approved Cost:</span> {formatCurrency(booking.approved_cost)}
+              </p>
+            )}
+            {booking.control_number && (
+              <p className="text-sm text-gray-600">
+                <span className="font-medium">Control Number:</span> {booking.control_number}
+              </p>
+            )}
+            {booking.rejection_reason && (
+              <p className="text-sm text-gray-600">
+                <span className="font-medium">Rejection Reason:</span> {booking.rejection_reason}
+              </p>
+            )}
           </div>
 
           <div className="border-t pt-4">
@@ -137,28 +198,85 @@ const BookingCard = memo(({
 
           {booking.status === "pending" && (
             <div className="border-t pt-4">
-              <div className="flex items-end gap-4">
-                <div className="flex-1">
-                  <Label htmlFor={`control-number-${booking.id}`}>Control Number</Label>
-                  <Input
-                    id={`control-number-${booking.id}`}
-                    value={controlNumber}
-                    onChange={(e) => onControlNumberChange(e.target.value)}
-                    placeholder="Enter control number (e.g., CN-12345678)"
-                  />
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor={`approved-cost-${booking.id}`}>Approved Cost (TZS)</Label>
+                    <Input
+                      id={`approved-cost-${booking.id}`}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={approvedCost}
+                      onChange={(e) => onApprovedCostChange(e.target.value)}
+                      placeholder="Enter approved cost (0 for free)"
+                    />
+                  </div>
+                  {parseFloat(approvedCost) > 0 && (
+                    <div>
+                      <Label htmlFor={`control-number-${booking.id}`}>Control Number</Label>
+                      <Input
+                        id={`control-number-${booking.id}`}
+                        value={controlNumber}
+                        onChange={(e) => onControlNumberChange(e.target.value)}
+                        placeholder="Enter control number (e.g., CN-12345678)"
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => onReject(booking)}>
-                    Reject
-                  </Button>
+                  <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" onClick={handleRejectClick}>
+                        Reject
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Reject Booking</DialogTitle>
+                        <DialogDescription>
+                          Please provide a reason for rejecting this booking request.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="rejection-reason">Rejection Reason</Label>
+                          <Textarea
+                            id="rejection-reason"
+                            value={rejectionReason}
+                            onChange={(e) => setRejectionReason(e.target.value)}
+                            placeholder="Enter the reason for rejection..."
+                            className="min-h-[100px]"
+                            required
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <Button variant="outline" onClick={() => setShowRejectDialog(false)}>
+                            Cancel
+                          </Button>
+                          <Button 
+                            onClick={handleRejectConfirm}
+                            disabled={!rejectionReason.trim()}
+                          >
+                            Confirm Rejection
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                   <Button 
                     size="sm" 
                     onClick={() => onApprove(booking)}
-                    disabled={isLoading}
+                    disabled={isLoading || (parseFloat(approvedCost) > 0 && !controlNumber.trim())}
                   >
                     {isLoading ? "Approving..." : "Approve"}
                   </Button>
                 </div>
+                {parseFloat(approvedCost) > 0 && !controlNumber.trim() && (
+                  <p className="text-sm text-red-600">
+                    Control number is required when approved cost is greater than 0.
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -178,7 +296,17 @@ export default function AdminBookingsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [controlNumbers, setControlNumbers] = useState<Record<string, string>>({})
+  const [approvedCosts, setApprovedCosts] = useState<Record<string, string>>({})
   const [loadingBookings, setLoadingBookings] = useState<Record<string, boolean>>({})
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'TZS',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount)
+  }
 
   useEffect(() => {
     if (!user || user.role !== "admin") {
@@ -214,10 +342,21 @@ export default function AdminBookingsPage() {
 
   const handleApprove = async (booking: Booking) => {
     const controlNumber = controlNumbers[booking.id]
-    if (!controlNumber) {
+    const approvedCost = parseFloat(approvedCosts[booking.id] || "0")
+    
+    if (approvedCost > 0 && !controlNumber) {
       toast({
         title: "Error",
-        description: "Please enter a control number",
+        description: "Please enter a control number when approved cost is greater than 0",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (approvedCost < 0) {
+      toast({
+        title: "Error",
+        description: "Approved cost cannot be negative",
         variant: "destructive",
       })
       return
@@ -225,13 +364,19 @@ export default function AdminBookingsPage() {
 
     setLoadingBookings(prev => ({ ...prev, [booking.id]: true }))
     try {
-      const result = await bookingService.updateBookingStatus(booking.id, "approved", controlNumber)
+      const result = await bookingService.updateBookingStatus(booking.id, "approved", controlNumber, approvedCost)
       if (result.success) {
         toast({
           title: "Success",
           description: "Booking approved successfully",
         })
+        // Clear the form data for this booking
         setControlNumbers(prev => {
+          const newState = { ...prev }
+          delete newState[booking.id]
+          return newState
+        })
+        setApprovedCosts(prev => {
           const newState = { ...prev }
           delete newState[booking.id]
           return newState
@@ -255,10 +400,10 @@ export default function AdminBookingsPage() {
     }
   }
 
-  const handleReject = async (booking: Booking) => {
+  const handleReject = async (booking: Booking, rejectionReason: string) => {
     setLoadingBookings(prev => ({ ...prev, [booking.id]: true }))
     try {
-      const result = await bookingService.updateBookingStatus(booking.id, "rejected")
+      const result = await bookingService.updateBookingStatus(booking.id, "rejected", null, null, rejectionReason)
       if (result.success) {
         toast({
           title: "Success",
@@ -295,6 +440,37 @@ export default function AdminBookingsPage() {
           <p className="text-gray-600">Review and manage venue booking requests</p>
         </div>
 
+        {/* Summary Statistics */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-blue-600">{pendingBookings.length}</div>
+              <p className="text-sm text-gray-600">Pending Review</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-green-600">{approvedBookings.length}</div>
+              <p className="text-sm text-gray-600">Approved</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-purple-600">{paidBookings.length}</div>
+              <p className="text-sm text-gray-600">Paid</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-orange-600">
+                {formatCurrency(approvedBookings
+                  .reduce((total, booking) => total + (booking.approved_cost || 0), 0))}
+              </div>
+              <p className="text-sm text-gray-600">Total Approved Cost</p>
+            </CardContent>
+          </Card>
+        </div>
+
         <Tabs defaultValue="pending" className="space-y-6">
           <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="pending">Pending ({pendingBookings.length})</TabsTrigger>
@@ -314,13 +490,19 @@ export default function AdminBookingsPage() {
                       key={booking.id}
                       booking={booking}
                       controlNumber={controlNumbers[booking.id] || ""}
+                      approvedCost={approvedCosts[booking.id] || ""}
                       isLoading={loadingBookings[booking.id] || false}
                       onControlNumberChange={(value) => setControlNumbers(prev => ({
                         ...prev,
                         [booking.id]: value
                       }))}
+                      onApprovedCostChange={(value) => setApprovedCosts(prev => ({
+                        ...prev,
+                        [booking.id]: value
+                      }))}
                       onApprove={handleApprove}
                       onReject={handleReject}
+                      formatCurrency={formatCurrency}
                     />
                 ))}
               </div>
