@@ -1,20 +1,20 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useAuth } from "@/contexts/AuthContext"
+import { useAuth, type User } from "@/contexts/AuthContext"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { User, Mail, Phone, Building, GraduationCap, Search } from "lucide-react"
+import { User as UserIcon, Mail, Phone, Building, GraduationCap, Search } from "lucide-react"
 import { AdminLayout } from "@/components/AdminLayout"
 import { mockAuthService } from "@/services/mockAuthService"
 
 export default function AdminUsersPage() {
   const { user } = useAuth()
-  const [users, setUsers] = useState([])
-  const [filteredUsers, setFilteredUsers] = useState([])
+  const [users, setUsers] = useState<User[]>([])
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [roleFilter, setRoleFilter] = useState("all")
 
@@ -45,7 +45,7 @@ export default function AdminUsersPage() {
     if (searchTerm) {
       filtered = filtered.filter(
         (u) =>
-          u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          u.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           u.email.toLowerCase().includes(searchTerm.toLowerCase()),
       )
     }
@@ -59,7 +59,7 @@ export default function AdminUsersPage() {
 
   const studentUsers = users.filter((u) => u.role === "student")
   const staffUsers = users.filter((u) => u.role === "staff")
-  const externalUsers = users.filter((u) => u.role === "external")
+  const externalUsers = users.filter((u) => u.role === "external user")
 
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -67,10 +67,27 @@ export default function AdminUsersPage() {
         return "bg-blue-100 text-blue-800"
       case "staff":
         return "bg-green-100 text-green-800"
-      case "external":
+      case "external user":
         return "bg-purple-100 text-purple-800"
+      case "admin":
+        return "bg-red-100 text-red-800"
       default:
         return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const getRoleDisplayName = (role: string) => {
+    switch (role) {
+      case "student":
+        return "Student"
+      case "staff":
+        return "Staff"
+      case "external user":
+        return "External User"
+      case "admin":
+        return "Admin"
+      default:
+        return "Unknown"
     }
   }
 
@@ -80,14 +97,14 @@ export default function AdminUsersPage() {
         return GraduationCap
       case "staff":
         return Building
-      case "external":
+      case "external user":
         return Building
       default:
-        return User
+        return UserIcon
     }
   }
 
-  const UserCard = ({ userData }: { userData: any }) => {
+  const UserCard = ({ userData }: { userData: User }) => {
     const RoleIcon = getRoleIcon(userData.role)
 
     return (
@@ -96,10 +113,10 @@ export default function AdminUsersPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-                <User className="w-6 h-6 text-gray-600" />
+                <UserIcon className="w-6 h-6 text-gray-600" />
               </div>
               <div>
-                <CardTitle className="text-lg">{userData.name}</CardTitle>
+                <CardTitle className="text-lg">{userData.full_name}</CardTitle>
                 <CardDescription className="flex items-center gap-1">
                   <Mail className="h-4 w-4" />
                   {userData.email}
@@ -108,23 +125,23 @@ export default function AdminUsersPage() {
             </div>
             <Badge className={`${getRoleColor(userData.role)} flex items-center gap-1`}>
               <RoleIcon className="w-4 h-4" />
-              {userData.role.charAt(0).toUpperCase() + userData.role.slice(1)}
+              {getRoleDisplayName(userData.role)}
             </Badge>
           </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-2 text-sm">
-            {userData.phone && (
+            {userData.phone_number && (
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4 text-gray-500" />
-                <span>{userData.phone}</span>
+                <span>{userData.phone_number}</span>
               </div>
             )}
 
-            {userData.studentId && (
+            {userData.registration_number && (
               <div className="flex items-center gap-2">
                 <GraduationCap className="h-4 w-4 text-gray-500" />
-                <span>Student ID: {userData.studentId}</span>
+                <span>Student ID: {userData.registration_number}</span>
               </div>
             )}
 
@@ -181,7 +198,7 @@ export default function AdminUsersPage() {
                   <SelectItem value="all">All Roles</SelectItem>
                   <SelectItem value="student">Students</SelectItem>
                   <SelectItem value="staff">Staff</SelectItem>
-                  <SelectItem value="external">External Users</SelectItem>
+                  <SelectItem value="external user">External Users</SelectItem>
                 </SelectContent>
               </Select>
             </div>
