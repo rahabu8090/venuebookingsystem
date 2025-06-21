@@ -10,48 +10,247 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, User, Mail, Phone, Building, GraduationCap } from "lucide-react"
+import { Loader2, User, Mail, Phone, Building, GraduationCap, Upload, Camera } from "lucide-react"
 import { DashboardLayout } from "@/components/DashboardLayout"
 import { useToast } from "@/hooks/use-toast"
 
+interface UserProfile {
+  id: string
+  full_name: string
+  email: string
+  image_path: string | null
+  role: string
+  phone_number: string
+  registration_number: string | null
+  address: string | null
+  profile_picture: string | null
+  is_active: boolean
+  email_verified_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export default function ProfilePage() {
-  const { user } = useAuth()
+  const { user: authUser } = useAuth()
   const { toast } = useToast()
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [profileLoading, setProfileLoading] = useState(false)
+  const [imageLoading, setImageLoading] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Use ref to track original values that can be updated
   const originalDataRef = useRef({
-    full_name: user?.full_name || "",
-    email: user?.email || "",
-    phone_number: user?.phone_number || "",
+    full_name: "",
+    email: "",
+    phone_number: "",
   })
 
   const [originalData, setOriginalData] = useState({
-    name: user?.full_name || "",
-    email: user?.email || "",
-    phone: user?.phone_number || "",
+    name: "",
+    email: "",
+    phone: "",
   })
 
   const [formData, setFormData] = useState({
-    name: user?.full_name || "",
-    email: user?.email || "",
-    phone: user?.phone_number || "",
+    name: "",
+    email: "",
+    phone: "",
   })
-  const [loading, setLoading] = useState(false)
 
-  // Update original data when user changes
+  // Fetch user profile from API
   useEffect(() => {
-    if (user) {
-      const userData = {
-        name: user.full_name,
-        email: user.email,
-        phone: user.phone_number,
-      }
-      setOriginalData(userData)
-      setFormData(userData)
-    }
-  }, [user])
+    const fetchUserProfile = async () => {
+      try {
+        const token = localStorage.getItem("token")
+        if (!token) {
+          toast({
+            title: "Authentication Error",
+            description: "Please log in again",
+            variant: "destructive",
+          })
+          return
+        }
 
-  if (!user) return null
+        const response = await fetch('http://127.0.0.1:8000/api/user/profile', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+
+        const result = await response.json()
+
+        if (result.success && result.data.user) {
+          const user = result.data.user
+          setUserProfile(user)
+          
+          // Set form data
+          const userData = {
+            name: user.full_name,
+            email: user.email,
+            phone: user.phone_number,
+          }
+          
+          setOriginalData(userData)
+          setFormData(userData)
+          
+          // Update ref
+          originalDataRef.current = {
+            full_name: user.full_name,
+            email: user.email,
+            phone_number: user.phone_number,
+          }
+        } else {
+          toast({
+            title: "Error",
+            description: result.message || "Failed to fetch user profile",
+            variant: "destructive",
+          })
+        }
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to fetch user profile",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (authUser) {
+      fetchUserProfile()
+    }
+  }, [authUser, toast])
+
+  if (!authUser || !userProfile) {
+    if (loading) {
+      return (
+        <DashboardLayout>
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        </DashboardLayout>
+      )
+    }
+    return null
+  }
+
+  // Helper function to get user image URL
+  const getUserImageUrl = (imagePath: string | null) => {
+    if (!imagePath) return null
+    const baseUrl = process.env.NEXT_PUBLIC_IMAGE_URL || 'http://127.0.0.1:8000'
+    return `${baseUrl}${imagePath}`
+  }
+
+  // Handle image selection
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png']
+      if (!allowedTypes.includes(file.type)) {
+        toast({
+          title: "Invalid File Type",
+          description: "Please select a JPG, JPEG, or PNG file",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Validate file size (2MB = 2 * 1024 * 1024 bytes)
+      if (file.size > 2 * 1024 * 1024) {
+        toast({
+          title: "File Too Large",
+          description: "Please select an image smaller than 2MB",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setSelectedImage(file)
+      
+      // Create preview
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setImagePreview(e.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  // Handle image upload
+  const handleImageUpload = async () => {
+    if (!selectedImage) {
+      toast({
+        title: "No Image Selected",
+        description: "Please select an image to upload",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setImageLoading(true)
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        toast({
+          title: "Authentication Error",
+          description: "Please log in again",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const formData = new FormData()
+      formData.append('image', selectedImage)
+
+      const response = await fetch('http://127.0.0.1:8000/api/user/profile/image', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      })
+
+      const result = await response.json()
+
+      if (result.success && result.data.user) {
+        toast({
+          title: "Success",
+          description: "Profile image updated successfully",
+        })
+        
+        // Update user profile with new image
+        setUserProfile(result.data.user)
+        
+        // Clear selection and preview
+        setSelectedImage(null)
+        setImagePreview(null)
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ''
+        }
+      } else {
+        toast({
+          title: "Upload Failed",
+          description: result.message || "Failed to upload image",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Upload Failed",
+        description: "An error occurred while uploading the image",
+        variant: "destructive",
+      })
+    } finally {
+      setImageLoading(false)
+    }
+  }
 
   // Helper function to get only changed fields
   const getChangedFields = () => {
@@ -72,7 +271,7 @@ export default function ProfilePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
+    setProfileLoading(true)
 
     try {
       const changedFields = getChangedFields()
@@ -84,7 +283,18 @@ export default function ProfilePage() {
           description: "No changes detected. Please modify at least one field before updating.",
           variant: "destructive",
         })
-        setLoading(false)
+        setProfileLoading(false)
+        return
+      }
+
+      const token = localStorage.getItem("token")
+      if (!token) {
+        toast({
+          title: "Authentication Error",
+          description: "Please log in again",
+          variant: "destructive",
+        })
+        setProfileLoading(false)
         return
       }
 
@@ -92,7 +302,7 @@ export default function ProfilePage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify(changedFields),
       })
@@ -105,23 +315,38 @@ export default function ProfilePage() {
           description: "Your profile has been successfully updated",
         })
         
-        // Update local storage with new user data
-        const updatedUser = { ...user, ...result.data.user }
-        localStorage.setItem('user', JSON.stringify(updatedUser))
-        
-        // Update the original data to reflect the new values
-        originalDataRef.current = {
-          full_name: result.data.user.full_name || result.data.user.name || formData.name,
-          email: result.data.user.email || formData.email,
-          phone_number: result.data.user.phone_number || result.data.user.phone || formData.phone,
-        }
-        
-        // Update form data to match the new original values
-        setFormData({
-          name: originalDataRef.current.full_name,
-          email: originalDataRef.current.email,
-          phone: originalDataRef.current.phone_number,
+        // Refresh user profile data
+        const profileResponse = await fetch('http://127.0.0.1:8000/api/user/profile', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
         })
+
+        const profileResult = await profileResponse.json()
+        
+        if (profileResult.success && profileResult.data.user) {
+          const updatedUser = profileResult.data.user
+          setUserProfile(updatedUser)
+          
+          // Update form data with new values
+          const userData = {
+            name: updatedUser.full_name,
+            email: updatedUser.email,
+            phone: updatedUser.phone_number,
+          }
+          
+          setOriginalData(userData)
+          setFormData(userData)
+          
+          // Update ref
+          originalDataRef.current = {
+            full_name: updatedUser.full_name,
+            email: updatedUser.email,
+            phone_number: updatedUser.phone_number,
+          }
+        }
         
       } else {
         toast({
@@ -138,7 +363,7 @@ export default function ProfilePage() {
       })
     }
 
-    setLoading(false)
+    setProfileLoading(false)
   }
 
   const handleInputChange = (field: keyof typeof formData, value: string) => {
@@ -198,7 +423,7 @@ export default function ProfilePage() {
     }
   }
 
-  const RoleIcon = getRoleIcon(user.role)
+  const RoleIcon = getRoleIcon(userProfile.role)
 
   return (
     <DashboardLayout>
@@ -212,33 +437,126 @@ export default function ProfilePage() {
           {/* Profile Summary */}
           <Card>
             <CardHeader className="text-center">
-              <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <User className="w-10 h-10 text-gray-600" />
+              <div className="relative w-48 h-48 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-8 overflow-hidden group">
+                {/* Profile Image */}
+                {imagePreview ? (
+                  <img
+                    src={imagePreview}
+                    alt={userProfile.full_name || "User"}
+                    className="w-full h-full object-cover"
+                  />
+                ) : userProfile.image_path ? (
+                  <img
+                    src={getUserImageUrl(userProfile.image_path) || ''}
+                    alt={userProfile.full_name || "User"}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      // Fallback to icon if image fails to load
+                      const target = e.target as HTMLImageElement
+                      target.style.display = 'none'
+                      target.nextElementSibling?.classList.remove('hidden')
+                    }}
+                  />
+                ) : null}
+                
+                {/* Fallback Icon */}
+                <div className={`w-full h-full flex items-center justify-center ${(imagePreview || userProfile.image_path) ? 'hidden' : ''}`}>
+                  <User className="w-24 h-24 text-gray-600" />
+                </div>
+                <div className="w-full h-full flex items-center justify-center hidden">
+                  <User className="w-24 h-24 text-gray-600" />
+                </div>
+
+                {/* Upload Overlay */}
+                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                  <Camera className="w-12 h-12 text-white" />
+                </div>
               </div>
-              <CardTitle>{user.full_name || "User"}</CardTitle>
-              <CardDescription>{user.email || "No email"}</CardDescription>
+
+              {/* Image Upload Section */}
+              <div className="space-y-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png"
+                  onChange={handleImageSelect}
+                  className="hidden"
+                />
+                
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Change Photo
+                </Button>
+
+                {selectedImage && (
+                  <div className="space-y-2">
+                    <div className="text-xs text-gray-500">
+                      Selected: {selectedImage.name}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleImageUpload}
+                        disabled={imageLoading}
+                        className="flex-1"
+                      >
+                        {imageLoading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4 mr-2" />
+                            Upload
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedImage(null)
+                          setImagePreview(null)
+                          if (fileInputRef.current) {
+                            fileInputRef.current.value = ''
+                          }
+                        }}
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <CardTitle>{userProfile.full_name || "User"}</CardTitle>
+              <CardDescription>{userProfile.email || "No email"}</CardDescription>
             </CardHeader>
             <CardContent className="text-center space-y-4">
-              <Badge className={`${getRoleColor(user.role)} flex items-center gap-2 justify-center`}>
+              <Badge className={`${getRoleColor(userProfile.role)} flex items-center gap-2 justify-center`}>
                 <RoleIcon className="w-4 h-4" />
-                {getRoleDisplayName(user.role)}
+                {getRoleDisplayName(userProfile.role)}
               </Badge>
 
-              {user.registration_number && (
+              {userProfile.registration_number && (
                 <div className="text-sm">
-                  <span className="font-medium">Student ID:</span> {user.registration_number}
+                  <span className="font-medium">Student ID:</span> {userProfile.registration_number}
                 </div>
               )}
 
-              {user.department && (
+              {userProfile.address && (
                 <div className="text-sm">
-                  <span className="font-medium">Department:</span> {user.department}
-                </div>
-              )}
-
-              {user.organization && (
-                <div className="text-sm">
-                  <span className="font-medium">Organization:</span> {user.organization}
+                  <span className="font-medium">Address:</span> {userProfile.address}
                 </div>
               )}
             </CardContent>
@@ -314,7 +632,7 @@ export default function ProfilePage() {
                       Role
                     </Label>
                     <Input
-                      value={getRoleDisplayName(user.role)}
+                      value={getRoleDisplayName(userProfile.role)}
                       disabled
                       className="bg-gray-50"
                     />
@@ -325,52 +643,60 @@ export default function ProfilePage() {
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-gray-900">Account Information</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {user.registration_number && (
-                      <div className="space-y-2">
-                        <Label htmlFor="studentId">Student ID</Label>
-                        <Input
-                          id="studentId"
-                          value={user.registration_number}
+                    {userProfile.registration_number && (
+                    <div className="space-y-2">
+                      <Label htmlFor="studentId">Student ID</Label>
+                      <Input
+                        id="studentId"
+                          value={userProfile.registration_number}
                           disabled
                           className="bg-gray-50"
                         />
                       </div>
                     )}
 
-                    {user.department && (
+                    {userProfile.address && (
                       <div className="space-y-2">
-                        <Label htmlFor="department">Department</Label>
+                        <Label htmlFor="address">Address</Label>
                         <Input
-                          id="department"
-                          value={user.department}
+                          id="address"
+                          value={userProfile.address}
                           disabled
                           className="bg-gray-50"
                         />
                       </div>
                     )}
 
-                    {user.organization && (
-                      <div className="space-y-2">
-                        <Label htmlFor="organization">Organization</Label>
-                        <Input
-                          id="organization"
-                          value={user.organization}
-                          disabled
-                          className="bg-gray-50"
-                        />
-                      </div>
-                    )}
+                    <div className="space-y-2">
+                      <Label htmlFor="status">Account Status</Label>
+                      <Input
+                        id="status"
+                        value={userProfile.is_active ? "Active" : "Inactive"}
+                        disabled
+                        className="bg-gray-50"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="createdAt">Member Since</Label>
+                      <Input
+                        id="createdAt"
+                        value={new Date(userProfile.created_at).toLocaleDateString()}
+                        disabled
+                        className="bg-gray-50"
+                      />
+                    </div>
                   </div>
-                </div>
+                  </div>
 
                 <Alert>
                   <AlertDescription>
-                    You can update your name, email, and phone number individually. Only modified fields will be sent to the server. Other information like your role, student ID, department, and organization cannot be changed. Contact administration if you need to update these details.
+                    You can update your name, email, and phone number individually. Only modified fields will be sent to the server. Other information like your role, student ID, and account status cannot be changed. Contact administration if you need to update these details.
                   </AlertDescription>
                 </Alert>
 
-                <Button type="submit" disabled={loading} className="w-full">
-                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Button type="submit" disabled={profileLoading} className="w-full">
+                  {profileLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Update Profile
                 </Button>
               </form>
