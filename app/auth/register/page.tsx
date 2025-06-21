@@ -151,7 +151,7 @@ export default function RegisterPage() {
                 <SelectContent>
                   <SelectItem value="student">Student</SelectItem>
                   <SelectItem value="staff">Staff</SelectItem>
-                  <SelectItem value="external">External User</SelectItem>
+                  <SelectItem value="external user">External User</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -194,7 +194,7 @@ export default function RegisterPage() {
               </div>
             )}
 
-            {formData.role === "external" && (
+            {formData.role === "external user" && (
               <div className="space-y-2">
                 <Label htmlFor="organization">Organization</Label>
                 <Input
