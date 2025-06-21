@@ -173,7 +173,7 @@ export default function PaymentPage({ params }: { params: { bookingId: string } 
               <div className="space-y-4">
                 <div className="flex justify-between items-center p-4 bg-blue-50 rounded-lg">
                   <span className="font-medium">Total Amount</span>
-                  <span className="text-2xl font-bold text-blue-600">${payment.amount}</span>
+                  <span className="text-2xl font-bold text-blue-600">TZS {payment.amount}</span>
                 </div>
 
                 <div className="space-y-2">
