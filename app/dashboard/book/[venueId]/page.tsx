@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,7 +21,8 @@ const AMENITIES = [
   { id: "sound_system", label: "Sound System", icon: Volume2 },
 ]
 
-export default function BookVenuePage({ params }: { params: { venueId: string } }) {
+export default function BookVenuePage({ params }: { params: Promise<{ venueId: string }> }) {
+  const { venueId } = use(params)
   const [venue, setVenue] = useState<Venue | null>(null)
   const [bookingData, setBookingData] = useState({
     booking_date: "",
@@ -64,7 +65,7 @@ export default function BookVenuePage({ params }: { params: { venueId: string } 
     setError("")
 
     const result = await bookingService.createBooking({
-      venue_id: params.venueId,
+      venue_id: venueId,
       ...bookingData,
     })
 
