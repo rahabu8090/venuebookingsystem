@@ -2,88 +2,96 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/AuthContext"
-import { useBooking } from "@/contexts/BookingContext"
+import { reportsService, type ReportsData } from "@/services/reportsService"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { TrendingUp, Users, Building2, Calendar, DollarSign } from "lucide-react"
+import { TrendingUp, Users, Building2, Calendar, DollarSign, Loader2 } from "lucide-react"
 import { AdminLayout } from "@/components/AdminLayout"
-import { mockAuthService } from "@/services/mockAuthService"
+import { useToast } from "@/hooks/use-toast"
 
 export default function AdminReportsPage() {
   const { user } = useAuth()
-  const { bookings, venues, payments } = useBooking()
-  const [users, setUsers] = useState([])
-  const [timeRange, setTimeRange] = useState("all")
+  const { toast } = useToast()
+  const [reportsData, setReportsData] = useState<ReportsData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
 
   useEffect(() => {
-    mockAuthService.getAllUsers().then(setUsers)
-  }, [])
+    if (user && user.role === "admin") {
+      fetchReports()
+    }
+  }, [user, selectedYear])
+
+  const fetchReports = async () => {
+    try {
+      setLoading(true)
+      const response = await reportsService.getReports(selectedYear)
+      if (response.success) {
+        setReportsData(response.data)
+      } else {
+        toast({
+          title: "Error",
+          description: response.message || "Failed to fetch reports",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error fetching reports:", error)
+      toast({
+        title: "Error",
+        description: "Failed to fetch reports",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'TZS',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount)
+  }
+
+  const formatMonth = (monthString: string) => {
+    const [year, month] = monthString.split('-')
+    const date = new Date(parseInt(year), parseInt(month) - 1)
+    return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+  }
 
   if (!user || user.role !== "admin") {
     return null
   }
 
-  // Calculate statistics
-  const totalRevenue = payments.filter((p) => p.status === "confirmed").reduce((sum, p) => sum + p.amount, 0)
-  const averageBookingValue = totalRevenue / Math.max(payments.filter((p) => p.status === "confirmed").length, 1)
-
-  // Bookings by user type
-  const bookingsByUserType = {
-    student: bookings.filter((b) => {
-      const userData = users.find((u) => u.id === b.userId)
-      return userData?.role === "student"
-    }).length,
-    staff: bookings.filter((b) => {
-      const userData = users.find((u) => u.id === b.userId)
-      return userData?.role === "staff"
-    }).length,
-    external: bookings.filter((b) => {
-      const userData = users.find((u) => u.id === b.userId)
-      return userData?.role === "external"
-    }).length,
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="flex items-center space-x-2">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span>Loading reports...</span>
+          </div>
+        </div>
+      </AdminLayout>
+    )
   }
 
-  // Venue utilization
-  const venueUtilization = venues.map((venue) => {
-    const venueBookings = bookings.filter((b) => b.venueId === venue.id)
-    return {
-      venue: venue.name,
-      bookings: venueBookings.length,
-      revenue: payments
-        .filter((p) => {
-          const booking = bookings.find((b) => b.id === p.bookingId)
-          return booking?.venueId === venue.id && p.status === "confirmed"
-        })
-        .reduce((sum, p) => sum + p.amount, 0),
-    }
-  })
-
-  // Booking status distribution
-  const statusDistribution = {
-    pending: bookings.filter((b) => b.status === "pending").length,
-    approved: bookings.filter((b) => b.status === "approved").length,
-    paid: bookings.filter((b) => b.status === "paid").length,
-    completed: bookings.filter((b) => b.status === "completed").length,
-    rejected: bookings.filter((b) => b.status === "rejected").length,
+  if (!reportsData) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">No Reports Available</h2>
+            <p className="text-gray-600">Unable to load report data</p>
+          </div>
+        </div>
+      </AdminLayout>
+    )
   }
-
-  // Payment status
-  const paymentStats = {
-    pending: payments.filter((p) => p.status === "pending").length,
-    confirmed: payments.filter((p) => p.status === "confirmed").length,
-    overdue: payments.filter((p) => p.status === "pending" && new Date() > new Date(p.deadline)).length,
-  }
-
-  // Monthly trends (mock data for demonstration)
-  const monthlyData = [
-    { month: "Jan", bookings: 12, revenue: 2400 },
-    { month: "Feb", bookings: 19, revenue: 3800 },
-    { month: "Mar", bookings: 15, revenue: 3000 },
-    { month: "Apr", bookings: 22, revenue: 4400 },
-    { month: "May", bookings: 18, revenue: 3600 },
-    { month: "Jun", bookings: 25, revenue: 5000 },
-  ]
 
   return (
     <AdminLayout>
@@ -93,15 +101,13 @@ export default function AdminReportsPage() {
             <h1 className="text-3xl font-bold text-gray-900">Reports & Analytics</h1>
             <p className="text-gray-600">System performance and usage statistics</p>
           </div>
-          <Select value={timeRange} onValueChange={setTimeRange}>
+          <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
             <SelectTrigger className="w-48">
-              <SelectValue placeholder="Select time range" />
+              <SelectValue placeholder="Select year" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Time</SelectItem>
-              <SelectItem value="month">This Month</SelectItem>
-              <SelectItem value="quarter">This Quarter</SelectItem>
-              <SelectItem value="year">This Year</SelectItem>
+              <SelectItem value={new Date().getFullYear().toString()}>This Year</SelectItem>
+              <SelectItem value={(new Date().getFullYear() - 1).toString()}>Last Year</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -114,8 +120,8 @@ export default function AdminReportsPage() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${totalRevenue.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground">From confirmed payments</p>
+              <div className="text-2xl font-bold">{formatCurrency(reportsData.overview.total_revenue)}</div>
+              <p className="text-xs text-muted-foreground">From approved bookings</p>
             </CardContent>
           </Card>
 
@@ -125,8 +131,8 @@ export default function AdminReportsPage() {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${averageBookingValue.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground">Per confirmed booking</p>
+              <div className="text-2xl font-bold">{formatCurrency(reportsData.overview.average_booking_value)}</div>
+              <p className="text-xs text-muted-foreground">Per approved booking</p>
             </CardContent>
           </Card>
 
@@ -136,7 +142,7 @@ export default function AdminReportsPage() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{users.length}</div>
+              <div className="text-2xl font-bold">{reportsData.overview.total_users}</div>
               <p className="text-xs text-muted-foreground">Registered users</p>
             </CardContent>
           </Card>
@@ -147,7 +153,7 @@ export default function AdminReportsPage() {
               <Building2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{venues.length}</div>
+              <div className="text-2xl font-bold">{reportsData.venue_utilization.length}</div>
               <p className="text-xs text-muted-foreground">Available for booking</p>
             </CardContent>
           </Card>
@@ -162,15 +168,15 @@ export default function AdminReportsPage() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">{bookingsByUserType.student}</div>
+                <div className="text-2xl font-bold text-blue-600">{reportsData.bookings_by_role.student}</div>
                 <div className="text-sm text-gray-600">Student Bookings</div>
               </div>
               <div className="text-center p-4 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">{bookingsByUserType.staff}</div>
+                <div className="text-2xl font-bold text-green-600">{reportsData.bookings_by_role.staff}</div>
                 <div className="text-sm text-gray-600">Staff Bookings</div>
               </div>
               <div className="text-center p-4 bg-purple-50 rounded-lg">
-                <div className="text-2xl font-bold text-purple-600">{bookingsByUserType.external}</div>
+                <div className="text-2xl font-bold text-purple-600">{reportsData.bookings_by_role["external user"]}</div>
                 <div className="text-sm text-gray-600">External Bookings</div>
               </div>
             </div>
@@ -185,14 +191,15 @@ export default function AdminReportsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {venueUtilization.map((venue, index) => (
+              {reportsData.venue_utilization.map((venue, index) => (
                 <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
                   <div>
-                    <h3 className="font-semibold">{venue.venue}</h3>
-                    <p className="text-sm text-gray-600">{venue.bookings} bookings</p>
+                    <h3 className="font-semibold">{venue.venue_name}</h3>
+                    <p className="text-sm text-gray-600">{venue.total_bookings} bookings</p>
+                    <p className="text-xs text-gray-500">Utilization: {venue.utilization_rate}%</p>
                   </div>
                   <div className="text-right">
-                    <div className="font-semibold">${venue.revenue}</div>
+                    <div className="font-semibold">{formatCurrency(venue.total_revenue)}</div>
                     <div className="text-sm text-gray-600">Revenue</div>
                   </div>
                 </div>
@@ -210,7 +217,7 @@ export default function AdminReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {Object.entries(statusDistribution).map(([status, count]) => (
+                {Object.entries(reportsData.booking_status_distribution).map(([status, count]) => (
                   <div key={status} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className="capitalize">
@@ -226,66 +233,30 @@ export default function AdminReportsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Payment Status</CardTitle>
-              <CardDescription>Current payment status overview</CardDescription>
+              <CardTitle>Monthly Trends</CardTitle>
+              <CardDescription>Booking and revenue trends over time</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
-                      Pending
-                    </Badge>
+              <div className="space-y-4">
+                {reportsData.monthly_trends.map((month, index) => (
+                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center gap-4">
+                      <div className="font-semibold w-20">{formatMonth(month.month)}</div>
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        <span>{month.total_bookings} bookings</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4" />
+                      <span className="font-semibold">{formatCurrency(month.total_revenue)}</span>
+                    </div>
                   </div>
-                  <div className="font-semibold">{paymentStats.pending}</div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="bg-green-100 text-green-800">
-                      Confirmed
-                    </Badge>
-                  </div>
-                  <div className="font-semibold">{paymentStats.confirmed}</div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="bg-red-100 text-red-800">
-                      Overdue
-                    </Badge>
-                  </div>
-                  <div className="font-semibold">{paymentStats.overdue}</div>
-                </div>
+                ))}
               </div>
             </CardContent>
           </Card>
         </div>
-
-        {/* Monthly Trends */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Monthly Trends</CardTitle>
-            <CardDescription>Booking and revenue trends over time</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {monthlyData.map((month, index) => (
-                <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center gap-4">
-                    <div className="font-semibold w-12">{month.month}</div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      <span>{month.bookings} bookings</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4" />
-                    <span className="font-semibold">${month.revenue}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </AdminLayout>
   )
