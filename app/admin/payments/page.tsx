@@ -116,7 +116,7 @@ export default function AdminPaymentsPage() {
               </CardDescription>
             </div>
             <Badge variant="outline" className="text-lg font-semibold">
-              ${payment.amount}
+              TZS {payment.amount}
             </Badge>
           </div>
         </CardHeader>
@@ -177,7 +177,7 @@ export default function AdminPaymentsPage() {
                       <div className="p-4 bg-gray-50 rounded-lg">
                         <div className="space-y-2 text-sm">
                           <div>
-                            <strong>Amount:</strong> ${payment.amount}
+                            <strong>Amount:</strong> TZS {payment.amount}
                           </div>
                           <div>
                             <strong>Control Number:</strong> {payment.controlNumber}
