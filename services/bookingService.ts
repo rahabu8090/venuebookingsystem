@@ -103,6 +103,9 @@ export interface Booking {
   event_details?: string
   status: "pending" | "approved" | "paid" | "completed" | "rejected"
   price?: number
+  approved_cost?: number
+  control_number?: string
+  rejection_reason?: string
 }
 
 interface BookingsResponse {
@@ -159,7 +162,7 @@ export const bookingService = {
       }
 
       // Transform API venue data to match our Venue type
-      const venues: Venue[] = Object.values(data.data).map((venue: VenueResponse) => ({
+      const venues: Venue[] = Object.values(data.data).map((venue: any) => ({
         id: venue.id,
         name: venue.name,
         capacity: venue.capacity,
@@ -290,7 +293,9 @@ export const bookingService = {
   async updateBookingStatus(
     bookingId: string,
     status: Booking["status"],
-    controlNumber?: string
+    controlNumber?: string,
+    approvedCost?: number,
+    rejectionReason?: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
       const token = localStorage.getItem("token")
@@ -300,13 +305,25 @@ export const bookingService = {
 
       let endpoint = `${API_URL}/admin/bookings/${bookingId}`
       let method = "PUT"
-      let body = { status }
+      let body: any = { status }
 
       // Use the approve endpoint for approved status
       if (status === "approved") {
         endpoint = `${API_URL}/admin/bookings/${bookingId}/approve`
         method = "POST"
-        body = { control_number: controlNumber }
+        body = { 
+          approved_cost: approvedCost || 0,
+          ...(approvedCost && approvedCost > 0 && controlNumber ? { control_number: controlNumber } : {})
+        }
+      }
+
+      // Use the reject endpoint for rejected status
+      if (status === "rejected") {
+        endpoint = `${API_URL}/admin/bookings/${bookingId}/reject`
+        method = "POST"
+        body = { 
+          rejection_reason: rejectionReason
+        }
       }
 
       const response = await fetch(endpoint, {
