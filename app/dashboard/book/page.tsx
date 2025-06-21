@@ -220,20 +220,24 @@ export default function BookVenuePage() {
                     <div>
                       <p className="text-sm font-medium mb-2">Amenities</p>
                       <div className="flex flex-wrap gap-2">
-                        {venue.amenities.map((amenity) => {
-                          const amenityInfo = AMENITIES.find((a) => a.id === amenity)
-                          if (!amenityInfo) return null
-                          const Icon = amenityInfo.icon
-                          return (
-                            <span
-                              key={amenity}
-                              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
-                            >
-                              <Icon className="mr-1 h-3 w-3" />
-                              {amenityInfo.label}
-                            </span>
-                          )
-                        })}
+                        {venue.amenities && venue.amenities.length > 0 ? (
+                          venue.amenities.map((amenity) => {
+                            const amenityInfo = AMENITIES.find((a) => a.id === amenity)
+                            if (!amenityInfo) return null
+                            const Icon = amenityInfo.icon
+                            return (
+                              <span
+                                key={amenity}
+                                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+                              >
+                                <Icon className="mr-1 h-3 w-3" />
+                                {amenityInfo.label}
+                              </span>
+                            )
+                          })
+                        ) : (
+                          <span className="text-sm text-gray-500">No amenities listed</span>
+                        )}
                       </div>
                     </div>
 
