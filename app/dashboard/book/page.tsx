@@ -213,7 +213,7 @@ export default function BookVenuePage() {
                       </div>
                       <div>
                         <p className="text-sm font-medium">Hourly Rate</p>
-                        <p className="text-sm text-gray-600">${venue.hourlyRate}</p>
+                        <p className="text-sm text-gray-600">TZS {venue.hourlyRate}</p>
                       </div>
                     </div>
 
