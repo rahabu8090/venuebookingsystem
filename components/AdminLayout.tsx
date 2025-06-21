@@ -32,7 +32,7 @@ interface AdminLayoutProps {
 }
 
 export function AdminLayout({ children }: AdminLayoutProps) {
-  const { user, logout } = useAuth()
+  const { user, logout, loading } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
 
@@ -49,6 +49,17 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     { name: "Payments", href: "/admin/payments", icon: CreditCard },
     { name: "Reports", href: "/admin/reports", icon: BarChart3 },
   ]
+
+  if (loading) {
+    return (
+      <div className="min-h-screen university-bg flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-white">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   if (!user || user.role !== "admin") return null
 
@@ -97,9 +108,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-12 w-12 rounded-full">
                     <Avatar className="h-10 w-10">
-                      <AvatarImage src="/placeholder-user.jpg" alt={user.name} />
+                      <AvatarImage src="/placeholder-user.jpg" alt={user.name || "Admin"} />
                       <AvatarFallback className="bg-white text-gray-900 font-semibold">
-                        {user.name.charAt(0)}
+                        {user.name ? user.name.charAt(0) : "A"}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
@@ -107,8 +118,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                 <DropdownMenuContent className="w-64 university-card" align="end" forceMount>
                   <DropdownMenuLabel className="font-normal p-4">
                     <div className="flex flex-col space-y-2">
-                      <p className="text-sm font-medium leading-none university-text-navy">{user.name}</p>
-                      <p className="text-xs leading-none text-gray-600">{user.email}</p>
+                      <p className="text-sm font-medium leading-none university-text-navy">{user.name || "Administrator"}</p>
+                      <p className="text-xs leading-none text-gray-600">{user.email || ""}</p>
                       <div className="inline-flex items-center px-2 py-1 rounded-md bg-red-50 text-xs font-medium text-red-700 w-fit border border-red-200">
                         <Shield className="w-3 h-3 mr-1" />
                         Administrator
@@ -157,54 +168,6 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">{children}</main>
-
-      {/* Footer */}
-      <footer className="university-footer mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Admin Portal</h3>
-              <p className="text-sm text-gray-300">
-                Comprehensive management system for university venue bookings and operations.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Management</h3>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <Link href="/admin">Dashboard</Link>
-                </li>
-                <li>
-                  <Link href="/admin/bookings">Bookings</Link>
-                </li>
-                <li>
-                  <Link href="/admin/users">Users</Link>
-                </li>
-                <li>
-                  <Link href="/admin/venues">Venues</Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold mb-4">System</h3>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <Link href="/admin/reports">Reports</Link>
-                </li>
-                <li>
-                  <Link href="/admin/settings">Settings</Link>
-                </li>
-                <li>
-                  <a href="mailto:admin@university.edu">Technical Support</a>
-                </li>
-              </ul>
-            </div>
-          </div>
-          <div className="border-t border-gray-600 mt-8 pt-8 text-center text-sm text-gray-300">
-            <p>&copy; 2024 University Admin Portal. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
     </div>
   )
 }
