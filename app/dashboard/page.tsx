@@ -109,7 +109,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold mb-2">
-                Welcome back, {user.name ? user.name.split(" ")[0] : "User"}{" "}
+                Welcome back, {user.full_name ? user.full_name.split(" ")[0] : "User"}{" "}
               </h1>
               <p className="text-blue-100 text-lg">Manage your venue bookings and explore available spaces</p>
             </div>
@@ -141,11 +141,11 @@ export default function DashboardPage() {
 
           <div className="stats-card">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-600">Completed</h3>
+              <h3 className="text-sm font-medium text-gray-600">Approved</h3>
               <Star className="h-5 w-5 text-university-green" />
             </div>
-            <div className="text-3xl font-bold text-university-green">{stats.completed_bookings}</div>
-            <p className="text-sm text-gray-500">Successfully completed</p>
+            <div className="text-3xl font-bold text-university-green">{stats.approved_bookings}</div>
+            <p className="text-sm text-gray-500">Successfully approved</p>
           </div>
         </div>
 
