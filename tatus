@@ -1,0 +1,25 @@
+[33mf2742a6[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m feat: Add venue service for admin venue management
+[33m78aec8f[m feat: Add AuthGuard protection to admin venues page
+[33mc600ab9[m feat: Add AuthGuard protection to admin payments page
+[33ma2916c4[m feat: Add AuthGuard protection to DashboardLayout
+[33m9f47e99[m feat: Add AuthGuard protection to root layout
+[33md5bd3aa[m feat: Add AuthGuard protection to payment page
+[33ma12d6ae[m feat: Add AuthGuard protection to booking search page
+[33m306de76[m feat: Add AuthGuard protection to dashboard page
+[33m73e017a[m refactor: Remove footer from AdminLayout for cleaner interface
+[33m2057f60[m refactor: Update admin dashboard to use 'external user' role in stats interface
+[33macb0877[m feat: Integrate real API data for admin reports page
+[33mecd31b0[m refactor: Update admin users page to use 'external user' role and improved User interface
+[33m67a6e00[m feat: Add rejection dialog with reason input for admin bookings
+[33m13712f0[m feat: Add rejection reason support to booking service
+[33m673233c[m fix: Update booking page to use React.use() for Next.js 15 params compatibility
+[33m83d0a04[m feat: Add visual indicators for modified fields in profile page
+[33mf85b7a7[m fix: Update register page to use 'external user' role for backend compatibility
+[33m39f1f27[m refactor: Update AuthContext with improved User interface and role types
+[33m79bd26d[m feat: Add timetable service for schedule management
+[33mf43900f[m feat: Add reports service for admin analytics API integration
+[33m6a1f842[m feat: Add AuthGuard component for role-based route protection
+[33md77a707[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Demo
+[33ma82762d[m feat: add venue service and constants for API integration
+[33m267c1e5[m fix: optimize booking card component to prevent cursor disappearing issue
+[33m27fbf3b[m fix: optimize booking card component to prevent cursor disappearing issue
