@@ -49,16 +49,19 @@ export default function ProfilePage() {
   })
 
   const [originalData, setOriginalData] = useState({
-    name: "",
+    full_name: "",
     email: "",
-    phone: "",
+    phone_number: "",
   })
 
   const [formData, setFormData] = useState({
-    name: "",
+    full_name: "",
     email: "",
-    phone: "",
+    phone_number: "",
   })
+
+  // Get API base URL from environment
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api'
 
   // Fetch user profile from API
   useEffect(() => {
@@ -74,7 +77,7 @@ export default function ProfilePage() {
           return
         }
 
-        const response = await fetch('http://127.0.0.1:8000/api/user/profile', {
+        const response = await fetch(`${API_BASE_URL}/user/profile`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -82,28 +85,28 @@ export default function ProfilePage() {
           },
         })
 
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+
         const result = await response.json()
 
         if (result.success && result.data.user) {
           const user = result.data.user
           setUserProfile(user)
           
-          // Set form data
+          // Set form data with correct field names
           const userData = {
-            name: user.full_name,
+            full_name: user.full_name,
             email: user.email,
-            phone: user.phone_number,
+            phone_number: user.phone_number,
           }
           
           setOriginalData(userData)
           setFormData(userData)
           
           // Update ref
-          originalDataRef.current = {
-            full_name: user.full_name,
-            email: user.email,
-            phone_number: user.phone_number,
-          }
+          originalDataRef.current = userData
         } else {
           toast({
             title: "Error",
@@ -112,6 +115,7 @@ export default function ProfilePage() {
           })
         }
       } catch (error) {
+        console.error("Profile fetch error:", error)
         toast({
           title: "Error",
           description: "Failed to fetch user profile",
@@ -125,7 +129,7 @@ export default function ProfilePage() {
     if (authUser) {
       fetchUserProfile()
     }
-  }, [authUser, toast])
+  }, [authUser, toast, API_BASE_URL])
 
   if (!authUser || !userProfile) {
     if (loading) {
@@ -143,7 +147,7 @@ export default function ProfilePage() {
   // Helper function to get user image URL
   const getUserImageUrl = (imagePath: string | null) => {
     if (!imagePath) return null
-    const baseUrl = process.env.NEXT_PUBLIC_IMAGE_URL || 'http://127.0.0.1:8000'
+    const baseUrl = process.env.NEXT_PUBLIC_IMAGE_URL || API_BASE_URL
     return `${baseUrl}${imagePath}`
   }
 
@@ -209,13 +213,17 @@ export default function ProfilePage() {
       const formData = new FormData()
       formData.append('image', selectedImage)
 
-      const response = await fetch('http://127.0.0.1:8000/api/user/profile/image', {
+      const response = await fetch(`${API_BASE_URL}/user/profile/image`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
         },
         body: formData,
       })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
 
       const result = await response.json()
 
@@ -242,6 +250,7 @@ export default function ProfilePage() {
         })
       }
     } catch (error) {
+      console.error("Image upload error:", error)
       toast({
         title: "Upload Failed",
         description: "An error occurred while uploading the image",
@@ -256,14 +265,14 @@ export default function ProfilePage() {
   const getChangedFields = () => {
     const changedFields: any = {}
     
-    if (formData.name !== originalData.name) {
-      changedFields.name = formData.name
+    if (formData.full_name !== originalData.full_name) {
+      changedFields.full_name = formData.full_name
     }
     if (formData.email !== originalData.email) {
       changedFields.email = formData.email
     }
-    if (formData.phone !== originalData.phone) {
-      changedFields.phone = formData.phone
+    if (formData.phone_number !== originalData.phone_number) {
+      changedFields.phone_number = formData.phone_number
     }
     
     return changedFields
@@ -298,7 +307,7 @@ export default function ProfilePage() {
         return
       }
 
-      const response = await fetch('http://127.0.0.1:8000/api/user/profile', {
+      const response = await fetch(`${API_BASE_URL}/user/profile`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -307,46 +316,34 @@ export default function ProfilePage() {
         body: JSON.stringify(changedFields),
       })
 
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
       const result = await response.json()
 
-      if (result.success) {
+      if (result.success && result.data.user) {
         toast({
           title: "Profile Updated",
           description: "Your profile has been successfully updated",
         })
         
-        // Refresh user profile data
-        const profileResponse = await fetch('http://127.0.0.1:8000/api/user/profile', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-        })
-
-        const profileResult = await profileResponse.json()
+        // Update user profile with new data from response
+        const updatedUser = result.data.user
+        setUserProfile(updatedUser)
         
-        if (profileResult.success && profileResult.data.user) {
-          const updatedUser = profileResult.data.user
-          setUserProfile(updatedUser)
-          
-          // Update form data with new values
-          const userData = {
-            name: updatedUser.full_name,
-            email: updatedUser.email,
-            phone: updatedUser.phone_number,
-          }
-          
-          setOriginalData(userData)
-          setFormData(userData)
-          
-          // Update ref
-          originalDataRef.current = {
-            full_name: updatedUser.full_name,
-            email: updatedUser.email,
-            phone_number: updatedUser.phone_number,
-          }
+        // Update form data with new values
+        const userData = {
+          full_name: updatedUser.full_name,
+          email: updatedUser.email,
+          phone_number: updatedUser.phone_number,
         }
+        
+        setOriginalData(userData)
+        setFormData(userData)
+        
+        // Update ref
+        originalDataRef.current = userData
         
       } else {
         toast({
@@ -356,6 +353,7 @@ export default function ProfilePage() {
         })
       }
     } catch (error) {
+      console.error("Profile update error:", error)
       toast({
         title: "Update Failed",
         description: "An error occurred while updating your profile",
@@ -572,20 +570,20 @@ export default function ProfilePage() {
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="name" className="flex items-center gap-2">
+                    <Label htmlFor="full_name" className="flex items-center gap-2">
                       <User className="h-4 w-4" />
                       Full Name
-                      {hasFieldChanged('name') && (
+                      {hasFieldChanged('full_name') && (
                         <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
                           Modified
                         </Badge>
                       )}
                     </Label>
                     <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => handleInputChange('name', e.target.value)}
-                      className={hasFieldChanged('name') ? 'border-blue-500' : ''}
+                      id="full_name"
+                      value={formData.full_name}
+                      onChange={(e) => handleInputChange('full_name', e.target.value)}
+                      className={hasFieldChanged('full_name') ? 'border-blue-500' : ''}
                     />
                   </div>
 
@@ -609,20 +607,20 @@ export default function ProfilePage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="phone" className="flex items-center gap-2">
+                    <Label htmlFor="phone_number" className="flex items-center gap-2">
                       <Phone className="h-4 w-4" />
                       Phone Number
-                      {hasFieldChanged('phone') && (
+                      {hasFieldChanged('phone_number') && (
                         <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
                           Modified
                         </Badge>
                       )}
                     </Label>
                     <Input
-                      id="phone"
-                      value={formData.phone}
-                      onChange={(e) => handleInputChange('phone', e.target.value)}
-                      className={hasFieldChanged('phone') ? 'border-blue-500' : ''}
+                      id="phone_number"
+                      value={formData.phone_number}
+                      onChange={(e) => handleInputChange('phone_number', e.target.value)}
+                      className={hasFieldChanged('phone_number') ? 'border-blue-500' : ''}
                     />
                   </div>
 
@@ -691,7 +689,7 @@ export default function ProfilePage() {
 
                 <Alert>
                   <AlertDescription>
-                    You can update your name, email, and phone number individually. Only modified fields will be sent to the server. Other information like your role, student ID, and account status cannot be changed. Contact administration if you need to update these details.
+                    You can update your full name, email, and phone number individually. Only modified fields will be sent to the server. Other information like your role, student ID, and account status cannot be changed. Contact administration if you need to update these details.
                   </AlertDescription>
                 </Alert>
 
