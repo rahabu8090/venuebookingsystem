@@ -765,9 +765,9 @@ export default function AdminBookingsPage() {
                         [booking.id]: value
                       }))}
                           onApprovedCostChange={(value) => setApprovedCosts(prev => ({
-                            ...prev,
-                            [booking.id]: value
-                          }))}
+                        ...prev,
+                        [booking.id]: value
+                      }))}
                       onApprove={handleApprove}
                       onReject={handleReject}
                           onUpdatePaymentStatus={handleUpdatePaymentStatus}
