@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { User as UserIcon, Mail, Phone, Building, GraduationCap, Search, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
 import { AdminLayout } from "@/components/AdminLayout"
 import { useToast } from "@/hooks/use-toast"
+import { useRouter } from "next/navigation"
 
 interface User {
   id: string
@@ -59,6 +60,7 @@ export default function AdminUsersPage() {
   const [pagination, setPagination] = useState<PaginationData | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null)
+  const router = useRouter()
 
   useEffect(() => {
     if (user?.role === "admin") {
@@ -361,7 +363,12 @@ export default function AdminUsersPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
+          <div className="flex justify-between items-center">
           <p className="text-gray-600">Manage system users and their roles</p>
+            <Button onClick={() => router.push('/admin/users/create')}>
+              Create Admin User
+            </Button>
+          </div>
         </div>
 
         {/* Search and Filter */}
