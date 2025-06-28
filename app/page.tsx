@@ -4,14 +4,35 @@ import { useAuth } from "@/contexts/AuthContext"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardDescription, CardTitle } from "@/components/ui/card"
-import { Building2, Calendar, Users, Shield, GraduationCap, BookOpen, Award } from "lucide-react"
+import { Card, CardDescription, CardTitle, CardContent, CardFooter } from "@/components/ui/card"
+import { Building2, Calendar, Users, Shield, GraduationCap, BookOpen, Award, MapPin, ArrowRight } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
+
+interface FeaturedVenue {
+  id: string
+  name: string
+  description: string
+  capacity: number
+  location: string
+  image_path: string | null
+  cost_amount: number
+}
 
 export default function HomePage() {
   const { user } = useAuth()
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
+  const [featuredVenues, setFeaturedVenues] = useState<FeaturedVenue[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Debug log for environment variables
+  useEffect(() => {
+    console.log('Environment Variables:', {
+      apiUrl: process.env.NEXT_PUBLIC_API_URL,
+      imageUrl: process.env.NEXT_PUBLIC_IMAGE_URL
+    })
+  }, [])
 
   useEffect(() => {
     setMounted(true)
@@ -24,11 +45,144 @@ export default function HomePage() {
     }
   }, [user, router])
 
+  useEffect(() => {
+    const fetchFeaturedVenues = async () => {
+      try {
+        // Use URL constructor to ensure proper URL formation
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, '') || ''
+        const apiUrl = new URL('/api/venues/featured', baseUrl).toString()
+        
+        console.log('Attempting to fetch featured venues from:', apiUrl)
+
+        const response = await fetch(apiUrl)
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+
+        const result = await response.json()
+        console.log('API Response:', result)
+        
+        if (result.success) {
+          setFeaturedVenues(result.data)
+        } else {
+          console.error('API returned error:', result.message)
+          setFeaturedVenues([])
+        }
+      } catch (error) {
+        console.error('Failed to fetch featured venues:', error)
+        setFeaturedVenues([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchFeaturedVenues()
+  }, []) // Only fetch on mount
+
+  // Add a useEffect to trigger initial load
+  useEffect(() => {
+    setLoading(true)
+  }, [])
+
   if (!mounted) return null
 
   if (user) {
     return null // Will redirect
   }
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'TZS',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount)
+  }
+
+  const getVenueImage = (imagePath: string | null) => {
+    try {
+      if (!imagePath) return '/images/venue-placeholder.jpg'
+      // Ensure the path starts with a slash
+      const normalizedPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`
+      return new URL(normalizedPath, process.env.NEXT_PUBLIC_IMAGE_URL).toString()
+    } catch (error) {
+      console.error('Invalid image path:', imagePath)
+      return '/images/venue-placeholder.jpg'
+    }
+  }
+
+  const FeaturedVenuesSection = () => (
+    <section className="py-12 px-6 bg-white">
+      <div className="container mx-auto">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h2 className="text-3xl font-bold text-blue-700 mb-2">Featured Venues</h2>
+            <p className="text-lg text-gray-600">
+              Discover our most popular venues available for booking
+            </p>
+          </div>
+          
+        </div>
+
+        {loading ? (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, i) => (
+              <Card key={i} className="animate-pulse">
+                <div className="h-40 bg-gray-200 rounded-t-lg" />
+                <CardContent className="p-4">
+                  <div className="h-5 bg-gray-200 rounded w-3/4 mb-3" />
+                  <div className="h-4 bg-gray-200 rounded w-1/2 mb-2" />
+                  <div className="h-4 bg-gray-200 rounded w-full" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {featuredVenues.map((venue) => (
+              <Card key={venue.id} className="overflow-hidden group">
+                <div className="relative h-40 overflow-hidden">
+                  <Image
+                    src={getVenueImage(venue.image_path)}
+                    alt={venue.name}
+                    fill
+                    className="object-cover group-hover:scale-110 transition-transform duration-300"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement
+                      target.src = '/images/venue-placeholder.jpg'
+                    }}
+                  />
+                </div>
+                <CardContent className="p-4">
+                  <CardTitle className="text-lg mb-2">{venue.name}</CardTitle>
+                  <div className="flex items-center text-gray-600 mb-2 text-sm">
+                    <MapPin className="h-4 w-4 mr-1 shrink-0" />
+                    <span className="truncate">{venue.location}</span>
+                  </div>
+                  <div className="flex items-center text-gray-600 mb-3 text-sm">
+                    <Users className="h-4 w-4 mr-1 shrink-0" />
+                    <span>Capacity: {venue.capacity} people</span>
+                  </div>
+                  <CardDescription className="line-clamp-2 text-sm mb-3">
+                    {venue.description}
+                  </CardDescription>
+                  <div className="flex items-center justify-between">
+                    <span className="text-base font-semibold text-blue-700">
+                      {formatCurrency(venue.cost_amount)}
+                    </span>
+                    <Link href="/auth/login">
+                      <Button size="sm">Book Now</Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  )
 
   return (
     <div className="min-h-screen bg-white">
@@ -133,6 +287,9 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Featured Venues */}
+      <FeaturedVenuesSection />
 
       {/* Who Can Use The System */}
       <section className="py-20 px-6 bg-white">

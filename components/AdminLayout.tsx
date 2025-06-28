@@ -121,14 +121,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                       </div>
                     </div>
                   </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/admin/settings" className="flex items-center">
-                      <Settings className="mr-2 h-4 w-4" />
-                      System Settings
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
+                  
                   <DropdownMenuItem onClick={handleLogout} className="text-red-600 hover:bg-red-50">
                     <LogOut className="mr-2 h-4 w-4" />
                     Sign Out

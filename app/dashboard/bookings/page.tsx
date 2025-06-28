@@ -25,20 +25,25 @@ import {
 import { Loader2, X, AlertTriangle, Upload, FileText, CreditCard } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
+// Extend the Booking type to include payment_evidence
+interface ExtendedBooking extends Booking {
+  payment_evidence?: string | null;
+}
+
 export default function BookingsPage() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const [bookings, setBookings] = useState<Booking[]>([])
+  const [bookings, setBookings] = useState<ExtendedBooking[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false)
-  const [cancellingBooking, setCancellingBooking] = useState<Booking | null>(null)
+  const [cancellingBooking, setCancellingBooking] = useState<ExtendedBooking | null>(null)
   const [cancellationReason, setCancellationReason] = useState("")
   const [cancelLoading, setCancelLoading] = useState(false)
   
   // Payment evidence upload states
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false)
-  const [uploadingBooking, setUploadingBooking] = useState<Booking | null>(null)
+  const [uploadingBooking, setUploadingBooking] = useState<ExtendedBooking | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploadLoading, setUploadLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -111,7 +116,7 @@ export default function BookingsPage() {
     }).format(amount)
   }
 
-  const handleCancelBooking = (booking: Booking) => {
+  const handleCancelBooking = (booking: ExtendedBooking) => {
     setCancellingBooking(booking)
     setCancellationReason("")
     setIsCancelDialogOpen(true)
@@ -165,7 +170,7 @@ export default function BookingsPage() {
   }
 
   // Payment evidence upload functions
-  const handlePaymentUpload = (booking: Booking) => {
+  const handlePaymentUpload = (booking: ExtendedBooking) => {
     setUploadingBooking(booking)
     setSelectedFile(null)
     setIsPaymentDialogOpen(true)
@@ -281,24 +286,19 @@ export default function BookingsPage() {
     }
   }
 
-  const BookingCard = ({ booking }: { booking: Booking }) => {
+  const BookingCard = ({ booking }: { booking: ExtendedBooking }) => {
     return (
       <Card>
         <CardHeader>
           <div className="flex justify-between items-start">
             <div>
-              <CardTitle>{booking.venue.name}</CardTitle>
-              <CardDescription>{booking.venue.location}</CardDescription>
+              <CardTitle>{booking.venue.name || 'Unnamed Venue'}</CardTitle>
+              <CardDescription>{booking.venue.location || 'Location not specified'}</CardDescription>
             </div>
             <div className="flex flex-col gap-2 items-end">
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(booking.status)}`}>
-                {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-              </span>
-              {booking.status === "approved" && booking.approved_cost && booking.approved_cost > 0 && (
-                <Badge variant="outline" className="text-green-600 border-green-600">
-                  Cost: {formatCurrency(booking.approved_cost)}
-                </Badge>
-              )}
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(booking.status)}`}>
+              {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+            </span>
             </div>
           </div>
         </CardHeader>
@@ -307,19 +307,25 @@ export default function BookingsPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-medium">Date</p>
-                <p className="text-sm text-gray-600">{formatDate(booking.booking_date)}</p>
+                <p className="text-sm text-gray-600">
+                  {booking.booking_date ? formatDate(booking.booking_date) : 'Date not set'}
+                </p>
               </div>
               <div>
                 <p className="text-sm font-medium">Time</p>
                 <p className="text-sm text-gray-600">
-                  {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
+                  {booking.start_time && booking.end_time ? (
+                    `${formatTime(booking.start_time)} - ${formatTime(booking.end_time)}`
+                  ) : (
+                    'Time not set'
+                  )}
                 </p>
               </div>
             </div>
 
             <div>
               <p className="text-sm font-medium">Purpose</p>
-              <p className="text-sm text-gray-600">{booking.purpose}</p>
+              <p className="text-sm text-gray-600">{booking.purpose || 'No purpose specified'}</p>
             </div>
 
             {booking.event_details && (
@@ -334,12 +340,12 @@ export default function BookingsPage() {
               <div className="flex flex-wrap gap-2 mt-1">
                 {booking.required_amenities && booking.required_amenities.length > 0 ? (
                   booking.required_amenities.map((amenity) => (
-                    <span
-                      key={amenity}
-                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
-                    >
-                      {amenity.charAt(0).toUpperCase() + amenity.slice(1)}
-                    </span>
+                  <span
+                    key={amenity}
+                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+                  >
+                    {amenity.charAt(0).toUpperCase() + amenity.slice(1)}
+                  </span>
                   ))
                 ) : (
                   <span className="text-sm text-gray-500">No amenities required</span>
@@ -347,41 +353,42 @@ export default function BookingsPage() {
               </div>
             </div>
 
-            {booking.approved_cost && booking.approved_cost > 0 && (
-              <div>
-                <p className="text-sm font-medium">Approved Cost</p>
-                <p className="text-sm text-gray-600">{formatCurrency(booking.approved_cost)}</p>
-              </div>
-            )}
+            {/* Payment Information Section */}
+            <div>
+              <p className="text-sm font-medium">Payment Status</p>
+              {booking.approved_cost && booking.approved_cost > 0 ? (
+                <div className="space-y-1">
+                  <p className="text-sm text-gray-600">Approved Cost: {formatCurrency(booking.approved_cost)}</p>
+                  {booking.control_number ? (
+                    <p className="text-sm text-gray-600">Control Number: {booking.control_number}</p>
+                  ) : (
+                    <p className="text-sm text-yellow-600">No Control Number provided</p>
+                  )}
+                  {booking.payment_evidence && booking.payment_evidence.trim() !== '' ? (
+                    <p className="text-sm text-green-600 flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      Payment evidence uploaded
+                    </p>
+                  ) : booking.status === "approved" ? (
+                    <p className="text-sm text-yellow-600">Awaiting payment evidence</p>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="text-sm text-green-600">No Payment Required</p>
+              )}
+            </div>
 
-            {booking.control_number && (
-              <div>
-                <p className="text-sm font-medium">Control Number</p>
-                <p className="text-sm text-gray-600">{booking.control_number}</p>
-              </div>
-            )}
-
-            {booking.rejection_reason && (
+            {booking.rejection_reason && booking.rejection_reason.trim() !== '' && (
               <div>
                 <p className="text-sm font-medium text-red-600">Rejection Reason</p>
                 <p className="text-sm text-red-600">{booking.rejection_reason}</p>
               </div>
             )}
 
-            {booking.cancellation_reason && (
+            {booking.cancellation_reason && booking.cancellation_reason.trim() !== '' && (
               <div>
                 <p className="text-sm font-medium text-gray-600">Cancellation Reason</p>
                 <p className="text-sm text-gray-600">{booking.cancellation_reason}</p>
-              </div>
-            )}
-
-            {booking.payment_evidence && (
-              <div>
-                <p className="text-sm font-medium text-green-600">Payment Evidence</p>
-                <p className="text-sm text-green-600 flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Payment evidence uploaded
-                </p>
               </div>
             )}
 
@@ -398,7 +405,10 @@ export default function BookingsPage() {
                 </Button>
               )}
 
-              {booking.status === "approved" && booking.approved_cost && booking.approved_cost > 0 && !booking.payment_evidence && (
+              {booking.status === "approved" && 
+                booking.approved_cost && 
+                booking.approved_cost > 0 && 
+                (!booking.payment_evidence || booking.payment_evidence.trim() === '') && (
                 <Button
                   variant="default"
                   size="sm"

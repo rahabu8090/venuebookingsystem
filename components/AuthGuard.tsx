@@ -13,17 +13,26 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     const userStr = localStorage.getItem("user")
     const user = userStr ? JSON.parse(userStr) : null
 
-    // If not logged in, redirect to login except on /, /auth/login, or /auth/register
+    // Define public routes that don't require authentication
+    const publicRoutes = [
+      "/",
+      "/auth/login",
+      "/auth/register",
+      "/auth/reset-password",
+      "/auth/reset-password/verify"
+    ]
+
+    // If not logged in, redirect to login except for public routes
     if (!token || !user) {
-      if (pathname !== "/" && pathname !== "/auth/login" && pathname !== "/auth/register") {
+      if (!publicRoutes.includes(pathname)) {
         router.replace("/auth/login")
       }
       return
     }
 
-    // If logged in and on home or login/register, redirect to dashboard
+    // If logged in and on public routes, redirect to dashboard
     if (token && user) {
-      if (pathname === "/" || pathname === "/auth/login" || pathname === "/auth/register") {
+      if (publicRoutes.includes(pathname)) {
         if (user.role === "admin") {
           router.replace("/admin")
         } else {

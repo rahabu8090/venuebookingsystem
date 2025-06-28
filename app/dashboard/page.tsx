@@ -109,7 +109,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold mb-2">
-                Welcome back, {user.full_name ? user.full_name.split(" ")[0] : "User"}{" "}
+                Welcome back, {user.name ? user.name.split(" ")[0] : "User"}{" "}
               </h1>
               <p className="text-blue-100 text-lg">Manage your venue bookings and explore available spaces</p>
             </div>
@@ -199,11 +199,7 @@ export default function DashboardPage() {
                       <h3 className="font-semibold text-blue-700 text-lg">{booking.venue.name}</h3>
                       <span className={getStatusColor(booking.status)}>{booking.status}</span>
                     </div>
-                    <Link href={`/dashboard/bookings/${booking.id}`}>
-                      <Button variant="outline" size="sm">
-                        View Details
-                      </Button>
-                    </Link>
+                   
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 mb-3">
