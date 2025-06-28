@@ -37,6 +37,23 @@ export default function BookVenuePage({ params }: { params: Promise<{ venueId: s
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
+  // Helper function to adjust time by -3 hours
+  const adjustTimeForTimezone = (timeString: string) => {
+    const [hours, minutes] = timeString.split(':').map(Number);
+    let adjustedHours = hours - 3;
+    
+    // Handle day wrap-around
+    if (adjustedHours < 0) {
+      adjustedHours = 24 + adjustedHours;
+    }
+    
+    // Format hours to ensure 2 digits
+    const formattedHours = adjustedHours.toString().padStart(2, '0');
+    const formattedMinutes = minutes.toString().padStart(2, '0');
+    
+    return `${formattedHours}:${formattedMinutes}`;
+  }
+
   useEffect(() => {
     // Get venue and search data from localStorage
     const venueData = localStorage.getItem("selectedVenue")
@@ -64,9 +81,16 @@ export default function BookVenuePage({ params }: { params: Promise<{ venueId: s
     setLoading(true)
     setError("")
 
+    // Adjust times before sending to API
+    const adjustedBookingData = {
+      ...bookingData,
+      start_time: adjustTimeForTimezone(bookingData.start_time),
+      end_time: adjustTimeForTimezone(bookingData.end_time)
+    }
+
     const result = await bookingService.createBooking({
       venue_id: venueId,
-      ...bookingData,
+      ...adjustedBookingData,
     })
 
     if (result.success) {

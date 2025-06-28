@@ -11,6 +11,12 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Search, Calendar, Clock, Users, Wifi, Monitor, PresentationIcon, Snowflake, Volume2 } from "lucide-react"
 import { bookingService } from "@/services/bookingService"
 import type { Venue } from "@/contexts/BookingContext"
+import Image from "next/image"
+
+// Update Venue type to match the API response
+interface VenueResponse extends Venue {
+  images: string[];
+}
 
 const AMENITIES = [
   { id: "wifi", label: "Wi-Fi", icon: Wifi },
@@ -30,23 +36,69 @@ export default function BookVenuePage() {
     required_capacity: 1,
     required_amenities: [] as string[],
   })
-  const [venues, setVenues] = useState<Venue[]>([])
+  const [venues, setVenues] = useState<VenueResponse[]>([])
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+
+  // Helper function to adjust time by -3 hours
+  const adjustTimeForTimezone = (timeString: string) => {
+    const [hours, minutes] = timeString.split(':').map(Number);
+    let adjustedHours = hours - 3;
+    
+    // Handle day wrap-around
+    if (adjustedHours < 0) {
+      adjustedHours = 24 + adjustedHours;
+    }
+    
+    // Format hours to ensure 2 digits
+    const formattedHours = adjustedHours.toString().padStart(2, '0');
+    const formattedMinutes = minutes.toString().padStart(2, '0');
+    
+    return `${formattedHours}:${formattedMinutes}`;
+  }
+
+  const getVenueImage = (venue: VenueResponse) => {
+    try {
+      const imagePath = venue.images && venue.images.length > 0 ? venue.images[0] : null;
+      
+      if (!imagePath) {
+        return '/images/venue-placeholder.jpg'
+      }
+      
+      const baseUrl = process.env.NEXT_PUBLIC_IMAGE_URL || 'http://127.0.0.1:8000'
+      const cleanBaseUrl = baseUrl.replace(/\/+$/, '')
+      const cleanImagePath = imagePath.replace(/^\/+/, '')
+      
+      return `${cleanBaseUrl}/${cleanImagePath}`
+    } catch (error) {
+      return '/images/venue-placeholder.jpg'
+    }
+  }
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError("")
 
-    const result = await bookingService.searchVenues(searchParams)
+    try {
+      // Adjust times before sending to API
+      const adjustedParams = {
+        ...searchParams,
+        start_time: adjustTimeForTimezone(searchParams.start_time),
+        end_time: adjustTimeForTimezone(searchParams.end_time)
+      }
 
-    if (result.success && result.venues) {
-      setVenues(result.venues)
-      setStep(2)
-    } else {
-      setError(result.error || "Failed to search venues")
+      const result = await bookingService.searchVenues(adjustedParams)
+
+      if (result.success && result.venues) {
+        setVenues(result.venues as VenueResponse[])
+        setStep(2)
+      } else {
+        setError(result.error || "Failed to search venues")
+      }
+    } catch (error) {
+      setError("An error occurred while searching venues")
     }
 
     setLoading(false)
@@ -187,73 +239,78 @@ export default function BookVenuePage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {venues.map((venue) => (
-                <Card key={venue.id}>
-                  <CardHeader>
-                    <CardTitle>{venue.name}</CardTitle>
-                    <CardDescription>{venue.location}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="aspect-video relative bg-gray-100 rounded-lg overflow-hidden">
-                      {venue.images[0] ? (
-                        <img src={venue.images[0]} alt={venue.name} className="object-cover w-full h-full" />
-                      ) : (
-                        <div className="flex items-center justify-center h-full text-gray-400">
-                          No image available
+              {venues.map((venue) => {
+                const imageUrl = getVenueImage(venue);
+                return (
+                  <Card key={venue.id} className="overflow-hidden group">
+                    <div className="relative h-48 overflow-hidden">
+                      <Image
+                        src={imageUrl}
+                        alt={venue.name}
+                        fill
+                        className="object-cover group-hover:scale-110 transition-transform duration-300"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.src = '/images/venue-placeholder.jpg'
+                        }}
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        priority={false}
+                        unoptimized={true}
+                      />
+                    </div>
+                    <CardContent className="p-4">
+                      <CardTitle className="text-lg mb-2">{venue.name}</CardTitle>
+                      <CardDescription className="text-sm mb-4">{venue.description}</CardDescription>
+
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <p className="text-sm font-medium">Capacity</p>
+                          <p className="text-sm text-gray-600">{venue.capacity} people</p>
                         </div>
-                      )}
-                    </div>
+                        <div>
+                          <p className="text-sm font-medium">Hourly Rate</p>
+                          <p className="text-sm text-gray-600">TZS {venue.hourlyRate}</p>
+                        </div>
+                      </div>
 
-                    <p className="text-sm text-gray-600">{venue.description}</p>
-
-                    <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <p className="text-sm font-medium">Capacity</p>
-                        <p className="text-sm text-gray-600">{venue.capacity} people</p>
+                        <p className="text-sm font-medium mb-2">Amenities</p>
+                        <div className="flex flex-wrap gap-2">
+                          {venue.amenities && venue.amenities.length > 0 ? (
+                            venue.amenities.map((amenity) => {
+                              const amenityInfo = AMENITIES.find((a) => a.id === amenity)
+                              if (!amenityInfo) return null
+                              const Icon = amenityInfo.icon
+                              return (
+                                <span
+                                  key={amenity}
+                                  className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+                                >
+                                  <Icon className="mr-1 h-3 w-3" />
+                                  {amenityInfo.label}
+                                </span>
+                              )
+                            })
+                          ) : (
+                            <span className="text-sm text-gray-500">No amenities listed</span>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium">Hourly Rate</p>
-                        <p className="text-sm text-gray-600">TZS {venue.hourlyRate}</p>
-                      </div>
-                    </div>
 
-                    <div>
-                      <p className="text-sm font-medium mb-2">Amenities</p>
-                      <div className="flex flex-wrap gap-2">
-                        {venue.amenities && venue.amenities.length > 0 ? (
-                          venue.amenities.map((amenity) => {
-                            const amenityInfo = AMENITIES.find((a) => a.id === amenity)
-                            if (!amenityInfo) return null
-                            const Icon = amenityInfo.icon
-                            return (
-                              <span
-                                key={amenity}
-                                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
-                              >
-                                <Icon className="mr-1 h-3 w-3" />
-                                {amenityInfo.label}
-                              </span>
-                            )
-                          })
-                        ) : (
-                          <span className="text-sm text-gray-500">No amenities listed</span>
-                        )}
-                      </div>
-                    </div>
-
-                    <Button 
-                      className="w-full" 
-                      onClick={() => {
-                        localStorage.setItem("selectedVenue", JSON.stringify(venue))
-                        localStorage.setItem("searchParams", JSON.stringify(searchParams))
-                        router.push(`/dashboard/book/${venue.id}`)
-                      }}
-                    >
-                      Book This Venue
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
+                      <Button 
+                        className="w-full mt-4" 
+                        onClick={() => {
+                          localStorage.setItem("selectedVenue", JSON.stringify(venue))
+                          localStorage.setItem("searchParams", JSON.stringify(searchParams))
+                          router.push(`/dashboard/book/${venue.id}`)
+                        }}
+                      >
+                        Book This Venue
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </div>
         )}
